@@ -44,4 +44,15 @@ exp_adv_cols = ["minute", "exp", "match_id", "leagueid"]
 
 gold_adv_cols = ["minute", "gold", "match_id", "leagueid"]
 
-team_fights_cols = ["start", "end", "last_death", "deaths", "players", "match_id", "leagueid"]
+team_fights_cols = ["start", "end", "last_death",
+                    "deaths", "players", "match_id", "leagueid"]
+
+leagues_cols = ["leagueid", "leaguename", "tier"]
+heroes_cols = ["", "id", "name", "primary_attr", "attack_type", "roles", "img", "icon",
+               "base_health", "base_health_regen", "base_mana", "base_mana_regen",
+               "base_armor", "base_mr", "base_attack_min", "base_attack_max",
+               "base_str", "base_agi",
+               "base_int", "str_gain", "agi_gain", "int_gain", "attack_range",
+               "projectile_speed", "attack_rate", "base_attack_time", "attack_point",
+               "move_speed", "turn_rate", "cm_enabled", "legs", "day_vision",
+               "night_vision", "localized_name"]

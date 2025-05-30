@@ -1,14 +1,19 @@
 {
-    "cSpell.words": [
-        "dota",
-        "Kaggle",
-        "kagglehub"
-    ],
-    "cSpell.ignoreWords": [
-        "bwandowando",
-        "leagueid",
-        "leaguename",
-        "nans",
-        "roshan"
-    ]
+  "files.exclude": {
+    "**/__pycache__/": true
+  },
+  "cSpell.words": [
+    "dota",
+    "Kaggle",
+    "kagglehub",
+    "regen",
+    "roshan"
+  ],
+  "cSpell.ignoreWords": [
+    "FIRSTBLOOD",
+    "bwandowando",
+    "leagueid",
+    "leaguename",
+    "nans"
+  ]
 }

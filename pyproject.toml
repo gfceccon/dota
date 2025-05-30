@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "hdbscan>=0.8.40",
     "kagglehub[polars-datasets]>=0.3.12",
+    "kmodes>=0.12.2",
     "numpy>=2.2.6",
     "polars>=1.30.0",
+    "scikit-learn>=1.6.1",
 ]
