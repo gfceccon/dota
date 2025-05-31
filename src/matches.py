@@ -47,6 +47,7 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
             pl.col("duration").alias("game_duration"),
         ])
         .join(other=leagues, on="league_id", how="left")
+        .drop("league_id")
     )
 
     return matches
