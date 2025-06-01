@@ -4,16 +4,20 @@
   },
   "cSpell.words": [
     "dota",
+    "Github",
     "Kaggle",
     "kagglehub",
     "regen",
-    "roshan"
+    "roshan",
+    "seduq"
   ],
   "cSpell.ignoreWords": [
     "FIRSTBLOOD",
     "bwandowando",
     "leagueid",
     "leaguename",
-    "nans"
-  ]
+    "nans",
+    "teamfights"
+  ],
+  "cSpell.language": "en,pt,pt-BR"
 }
