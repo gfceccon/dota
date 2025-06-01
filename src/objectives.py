@@ -3,7 +3,6 @@ from files import (
     objectives_file,
 )
 
-
 def get_objectives(path: str) -> pl.LazyFrame:
     """
     Load objectives data from CSV files and return a Polars LazyFrame.

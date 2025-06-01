@@ -2,16 +2,11 @@ import kagglehub
 import polars as pl
 from files import (
     players_file,
-    draft_file,
+    picks_bans_file,
 )
 
 
-active_teams = {
-    "Radiant": 2,
-    "Dire": 3,
-}
-
-def get_players_draft(path: str):
+def get_players_draft(path: str, matches: pl.LazyFrame) -> pl.LazyFrame:
     """    Load players and draft data from CSV files and return a Polars LazyFrame.
     Args:
         path (str): The directory path where the CSV files are located.
@@ -20,19 +15,17 @@ def get_players_draft(path: str):
     """
 
     players_cols = [
-        "match_id",
         "kills", "deaths", "assists",
-        # "obs_placed", "sen_placed",
+        "hero_id", "player_slot", "account_id",
+        "obs_placed", "sen_placed",
         "gold_per_min", "xp_per_min",
-        # "hero_damage", "tower_damage", "hero_healing",
-        # "last_hits", "denies",
-        # "roshan_kills", "tower_kills",
+        "hero_damage", "tower_damage", "hero_healing",
+        "roshan_kills", "tower_kills",
     ]
 
-    draft_cols = [
-        "pick", 
-        "active_team", 
-        "player_slot",
+    picks_cols = [
+        "is_pick",
+        "team",
         "hero_id",
     ]
 
@@ -41,37 +34,40 @@ def get_players_draft(path: str):
         .select([pl.col(col).alias(f"player_{col}") for col in players_cols] + ["match_id"])
     )
 
-    draft = (
-        pl.scan_csv(f"{path}/{draft_file}")
-        .drop_nulls(subset="active_team")
-        .filter(pl.col("active_team").is_in(active_teams.values()))
-        .select([pl.col(col).alias(f"draft_{col}") for col in draft_cols] + ["match_id"])
+    picks = (
+        pl.scan_csv(f"{path}/{picks_bans_file}")
+        .drop_nulls(subset="team")
+        .select([pl.col(col).alias(f"pick_{col}") for col in picks_cols] + ["match_id"])
     )
 
-    # Primeiro fazer o join e depois filtrar
-    game_radiant_pick = (
-        players
-        .join(other=draft, on="match_id", how="inner")
-        .filter(pl.col("draft_pick") == True)
-        .filter(pl.col("draft_player_slot").str.len_chars() > 0)
-        .filter(pl.col("draft_active_team") == active_teams["Radiant"])
+    games = (
+        matches
+        .join(other=picks, on="match_id", how="inner")
+        .join(other=players, left_on=["match_id", "pick_hero_id"], right_on=["match_id", "player_hero_id"], how="left")
+        .with_columns([
+            pl.when(pl.col("pick_is_pick") == False)
+              .then(pl.col("pick_hero_id"))
+              .otherwise(None)
+              .alias("ban_hero_id"),
+            pl.when(pl.col("pick_is_pick").eq(True)
+                    & pl.col("pick_team").eq(0))
+              .then(pl.col("pick_hero_id"))
+              .otherwise(None)
+              .alias("radiant_hero_id"),
+            pl.when(pl.col("pick_is_pick") .eq(True)
+                    & pl.col("pick_team").eq(1))
+              .then(pl.col("pick_hero_id"))
+              .otherwise(None)
+              .alias("dire_hero_id"),
+        ])
+        .drop(["pick_hero_id", "pick_team", "pick_is_pick"])
+        .select([
+            "match_id",
+            "radiant_hero_id", "dire_hero_id", "ban_hero_id",
+            "player_kills", "player_deaths", "player_assists",
+            pl.col("player_gold_per_min").alias("player_gpm"),
+            pl.col("player_xp_per_min").alias("player_xpm"),
+        ])
     )
 
-    game_dire_pick = (
-        players
-        .join(other=draft, on="match_id", how="inner")
-        .drop_nulls(subset="draft_active_team")
-        .filter(pl.col("draft_pick") == True)
-        .filter(pl.col("draft_player_slot").str.len_chars() > 0)
-        .filter(pl.col("draft_active_team") == active_teams["Dire"])
-    )
-
-    game_players_bans = (
-        players
-        .join(other=draft, on="match_id", how="inner")
-        .drop_nulls(subset="draft_active_team")
-        .filter(pl.col("draft_pick") == False)
-        .join(other=draft, on="match_id", how="inner")
-    )
-
-    return game_radiant_pick, game_dire_pick, game_players_bans
+    return games

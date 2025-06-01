@@ -10,3 +10,8 @@ gold_adv_file = f"{year}/radiant_gold_adv.csv"
 team_fights_file = f"{year}/teamfights.csv"
 leagues_file = f"Constants/Constants.Leagues.csv"
 heroes_file = f"Constants/Constants.Heroes.csv"
+patches_file = f"Constants/Constants.Patch.csv"
+patches_notes_file = f"Constants/Constants.PatchNotes.csv"
+
+def get_metadata(year: str) -> str:
+    return f"{year}/main_metadata.csv"
