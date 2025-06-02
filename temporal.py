@@ -1,6 +1,6 @@
 # import ast
 # import polars as pl
-# from src.dataset import players
+# from dataset import players
 
 # gold_t = (
 #     players
