@@ -1,6 +1,6 @@
 import polars as pl
-from matches import get_matches
-from players import get_players_draft
+from src.matches import get_matches
+from src.players import get_players_draft
 
 
 def preprocess_dota_dataset(path: str, patches: list[int], tier: list[str],
