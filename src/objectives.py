@@ -4,16 +4,6 @@ from files import (
 )
 
 def get_objectives(path: str) -> pl.LazyFrame:
-    """
-    Load objectives data from CSV files and return a Polars LazyFrame.
-
-    Args:
-        path (str): The directory path where the CSV files are located.
-        matches (pl.LazyFrame): A Polars LazyFrame containing match metadata.
-
-    Returns:
-        pl.LazyFrame: A Polars LazyFrame containing the objectives data.
-    """
 
     cols = [
         "match_id", "time", "type", "value", "killer", "team",

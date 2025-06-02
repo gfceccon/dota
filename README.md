@@ -4,15 +4,15 @@
 
 ## Clustering
 * [] Pre-processing
-  * [x] Patch (54)
+  * [x] Patch
   * [x] League (Professional)
-  * [] Heroes (Vector)
+  * [x] Heroes (Vector)
     * [] Attributes (Vector)
-  * [] Duration (30 < Time < 120)
-  * [] Picks and Bans (Vector)
+  * [] Duration (10 < Time < 120)
+  * [x] Picks and Bans (Vector)
   * [] Gold per Minute (Temporal)
   * [] Exp per Minute (Temporal)
-  * [] Sentries and Observers (Feature)
+  * [x] Sentries and Observers (Feature)
   * [] Itens (?)
 * [] K-Means / K-Shape
 * [] DBSCAN / HDBSCAN

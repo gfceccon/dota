@@ -6,24 +6,7 @@ from files import (
 )
 
 
-def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 * 60) -> pl.LazyFrame:
-    """
-    Load matches data from CSV files and return a Polars LazyFrame.
-
-    Args:
-        path (str): The directory path where the CSV files are located.
-        patches (list[int]): List of patch versions to filter matches.
-        tier (list[str]): List of league tiers to filter matches.
-        min_duration (int): Minimum game duration in seconds to filter matches. Default is 10 minutes (600 seconds).
-
-    Returns:
-        pl.LazyFrame: A Polars LazyFrame containing the matches data.
-        Columns include:
-            - match_id
-            - league_id
-            - game_duration
-    """
-
+def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 * 60, max_duration=120*60) -> pl.LazyFrame:
     leagues = (
         pl.scan_csv(f"{path}/{leagues_file}")
         .filter(pl.col("tier").is_in(tier))
@@ -39,7 +22,7 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
         .drop_nans(subset="match_id")
         .filter(
             pl.col("patch").is_in(patches),
-            pl.col("duration") >= min_duration,
+            pl.col("duration").is_between(min_duration, max_duration),
         )
         .select([
             "match_id",
