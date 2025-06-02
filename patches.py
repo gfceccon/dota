@@ -1,6 +1,6 @@
 import kagglehub
 import polars as pl
-from src.files import (
+from files import (
     get_metadata,
     patches_file,
 )

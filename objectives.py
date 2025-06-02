@@ -1,5 +1,5 @@
 import polars as pl
-from src.files import (
+from files import (
     objectives_file,
 )
 

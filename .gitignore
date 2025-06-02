@@ -172,30 +172,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-data_2024/all_word_counts.csv
-data_2024/chat.csv
-data_2024/cosmetics.csv
-data_2024/draft_timings.csv
-data_2024/main_metadata.csv
-data_2024/objectives.csv
-data_2024/picks_bans.csv
-data_2024/players.csv
-data_2024/radiant_exp_adv.csv
-data_2024/radiant_gold_adv.csv
-data_2024/teamfights.csv
-data_2024/teams.csv
-opendota_api.json
-constants/Constants.Abilities.csv
-constants/Constants.AbilitiesId.csv
-constants/Constants.AghanimHeroUpgrades.csv
-constants/Constants.ChatWheel.csv
-constants/Constants.GameModes.csv
-constants/Constants.HeroAbilitiesAndTalents.csv
-constants/Constants.Heroes.csv
-constants/Constants.HeroLore.csv
-constants/Constants.ItemIDs.csv
-constants/Constants.Items.csv
-constants/Constants.Leagues.csv
-constants/Constants.Patch.csv
-constants/Constants.PatchNotes.csv
-constants/Constants.Regions.csv
+/constants/
+/tmp/
+processed_dataset.json

@@ -1,6 +1,6 @@
 import kagglehub
 import polars as pl
-from src.files import (
+from files import (
     players_file,
     picks_bans_file,
 )
