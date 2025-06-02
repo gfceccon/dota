@@ -1,7 +1,7 @@
 import kagglehub
 import polars as pl
-from patches import get_patches
-from preprocessing import preprocess_dota_dataset
+from src.patches import get_patches
+from src.preprocessing import preprocess_dota_dataset
 
 
 def get_dataset(path: str, patches: list[int], tier: list[str] = ["professional"], 

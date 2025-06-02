@@ -1,6 +1,6 @@
 import kagglehub
 import polars as pl
-from files import (
+from src.files import (
     metadata_file,
     leagues_file
 )
