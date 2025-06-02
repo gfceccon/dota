@@ -4,28 +4,20 @@ from patches import get_patches
 from preprocessing import preprocess_dota_dataset
 
 
-def get_dataset(path: str, patches: list[int], tier: list[str] = ["professional"], min_duration: int = 10 * 60) -> pl.DataFrame:
-    """
-    Função principal para carregar e pré-processar o dataset de Dota 2.
-    """
+def get_dataset(path: str, patches: list[int], tier: list[str] = ["professional"], 
+                min_duration: int = 10 * 60, max_duration: int = 120*60) -> pl.DataFrame:
     
     dataset = preprocess_dota_dataset(
-        path=path,
-        patches=patches,
-        tier=tier,
-        min_duration=min_duration
+        path,
+        patches,
+        tier,
+        min_duration,
+        max_duration
     )
     
     return dataset
 
 def save_dataset(dataset: pl.DataFrame, output_path: str):
-    """
-    Salva o dataset pré-processado.
-
-    Args:
-        dataset: Dataset pré-processado
-        output_path: Caminho para salvar o arquivo
-    """
     print(f"Salvando dataset em {output_path}...")
     dataset.write_json(output_path)
     print("Dataset salvo com sucesso!")
@@ -63,5 +55,5 @@ if __name__ == "__main__":
     print(sample)
     
     # Salvar dataset processado
-    output_path = "/home/seduq/Github/dota/processed_dataset.json"
-    save_dataset(dataset, output_path)
+    output_path = "./processed_dataset.json"
+    save_dataset(dataset.head(5), output_path)
