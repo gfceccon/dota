@@ -4,6 +4,8 @@ from patches import get_patches
 from preprocessing import preprocess_dota_dataset
 
 
+
+
 def get_dataset(path: str, patches: list[int], tier: list[str] = ["professional"], 
                 min_duration: int = 10 * 60, max_duration: int = 120*60) -> pl.DataFrame:
     
@@ -28,6 +30,7 @@ if __name__ == "__main__":
     # Download do dataset
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023/versions/177"
     path = kagglehub.dataset_download(dataset_name)
+    print(f"Dataset baixado para: {path}")
 
     # Definir patches e tier
     patches = get_patches(path, begin_year=2023, end_year=2024) # Patches disponíveis
@@ -55,5 +58,5 @@ if __name__ == "__main__":
     print(sample)
     
     # Salvar dataset processado
-    output_path = "./processed_dataset.json"
+    output_path = "./tmp/processed_dataset.json"
     save_dataset(dataset.head(5), output_path)
