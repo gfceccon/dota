@@ -12,7 +12,7 @@ def get_heroes(path: str):
 
     roles: list[str] = list({role for roles_list in heroes.select("roles").collect().to_series().to_list() for role in (
         ast.literal_eval(roles_list) if isinstance(roles_list, str) else roles_list)})
-    dict_roles = {role: i for i, role in enumerate(roles)}
+    dict_roles = {role: i + 1 for i, role in enumerate(roles)}
 
     return heroes.with_columns(
         pl.col("primary_attr").map_elements(lambda x: dict_attributes.get(x) if isinstance(
