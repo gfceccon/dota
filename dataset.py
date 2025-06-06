@@ -1,95 +1,72 @@
 import ast
 import kagglehub
 import polars as pl
-from heroes import get_heroes
 from patches import get_patches
 from matches import get_matches
-from players import get_players_draft, game_cols
-from players import game_cols
+from players import get_players_draft
 import ast
 
 
 def preprocess_dataset(path: str, patches: list[int], tier: list[str],
-                       min_duration: int = 10 * 60, max_duration: int = 120 * 60) -> pl.LazyFrame:
+                       min_duration: int = 10 * 60, max_duration: int = 120 * 60) -> tuple[pl.LazyFrame, list[str], list[str]]:
+
     # Carregando e filtrando partidas
     matches = get_matches(path, patches, tier, min_duration, max_duration)
 
     # Carregando jogos e draft de jogadores
-    games = get_players_draft(path, matches)
+    games, games_cols, hero_cols = get_players_draft(path, matches)
 
     # Agrupando dados por partida
     dataset = (
         games.group_by("match_id")
         .agg(
             pl.all().drop_nulls(),
-            
             pl.when(pl.col("team") == 0, pl.col("pick")).then(
-                pl.col("hero")).drop_nulls().alias("radiant_picks"),
+                pl.col("hero_id")).drop_nulls().alias("radiant_picks"),
             pl.when(pl.col("team") == 1, pl.col("pick")).then(
-                pl.col("hero")).drop_nulls().alias("dire_picks"),
-            
+                pl.col("hero_id")).drop_nulls().alias("dire_picks"),
+
             pl.when(pl.col("team") == 0, ~pl.col("pick")).then(
-                pl.col("hero")).drop_nulls().alias("radiant_bans"),
+                pl.col("hero_id")).drop_nulls().alias("radiant_bans"),
             pl.when(pl.col("team") == 1, ~pl.col("pick")).then(
-                pl.col("hero")).drop_nulls().alias("dire_bans"),
-            
+                pl.col("hero_id")).drop_nulls().alias("dire_bans"),
+
             pl.concat_list([pl.col(f"{col}").max()
-                           for col in game_cols]).alias("max_stats"),
+                           for col in games_cols]).alias("max_stats"),
+            
+            pl.concat_list([pl.col(f"{col}").min()
+                           for col in games_cols]).alias("min_stats"),
         ))
+    return dataset, games_cols, hero_cols
 
-    return dataset
 
+def get_dataset(path: str, years: tuple[int, int] = (2023, 2024), tier: list[str] = ['professional'], duration: tuple[int, int] = (30, 120)) -> tuple[pl.DataFrame, list[str], list[str]]:
+    print(f"Carregando dataset de {years[0]} a {years[1]}...")
+    print(f"Tier: {tier}, Duração: {duration[0]}-{duration[1]} minutos")
 
-def get_dataset(path: str, years: tuple[int, int] = (2023, 2024), tier: list[str] = ['professional'], duration: tuple[int, int] = (30, 120)) -> pl.DataFrame:
     patches = get_patches(path, begin_year=years[0], end_year=years[1])
-    dataset = preprocess_dataset(
+    dataset, games_cols, hero_cols = preprocess_dataset(
         path,
         list(patches.keys()),
         tier,
         duration[0] * 60,
         duration[1] * 60
     )
-    return dataset.collect()
+
+    dataset = (
+        dataset
+        .select(
+            "radiant_hero_roles", "dire_hero_roles",
+            "radiant_stats", "dire_stats",
+            "radiant_picks", "dire_picks",
+            "radiant_bans", "dire_bans",
+            "min_stats", "max_stats",)
+        .collect())
+    print("Dataset carregado e pré-processado com sucesso!")
+    return dataset, games_cols, hero_cols
 
 
 def save_dataset(dataset: pl.DataFrame, output_path: str = "./tmp/DATASET.json") -> None:
     print(f"Salvando dataset em {output_path}...")
     dataset.write_json(output_path)
     print("Dataset salvo com sucesso!")
-
-
-if __name__ == "__main__":
-
-    # Download do dataset
-    dataset_name = "bwandowando/dota-2-pro-league-matches-2023/versions/177"
-    path = kagglehub.dataset_download(dataset_name)
-    print(f"Dataset baixado para: {path}")
-
-    # Definir patches e tier
-    patches = get_patches(path, begin_year=2023,
-                          end_year=2024)  # Patches disponíveis
-    tier = ["professional"]  # Tier de interesse
-
-    print(f"Patches disponíveis: {patches}")
-    sum = 0
-    for patch, (count, _) in patches.items():
-        sum += count
-    print(f"- Total de jogos: {sum}")
-
-    # Carregar e pré-processar o dataset
-    dataset = get_dataset(path, (2023, 2024),
-                          tier, duration=(30, 120))
-
-    # Mostrar informações do dataset
-    print(f"\nDataset pré-processado:")
-    print(f"- Número de matches: {len(dataset)}")
-    print(f"- Número de features: {len(dataset.columns)}")
-    print(f"- Colunas: {dataset.columns[:10]}...")  # Primeiras 10 colunas
-
-    sample = dataset.sample()
-    print(f"\nExibindo dados do match_id {sample["match_id"][0]}:")
-    print(sample)
-
-    # Salvar dataset processado
-    output_path = "./tmp/processed_dataset.json"
-    save_dataset(dataset.head(5), output_path)
