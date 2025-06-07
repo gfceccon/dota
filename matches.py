@@ -1,14 +1,14 @@
 import kagglehub
 import polars as pl
 from files import (
-    metadata_file,
-    leagues_file
+    Dota2Files,
+    get_lf,
 )
 
 
 def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 * 60, max_duration=120*60) -> pl.LazyFrame:
     leagues = (
-        pl.scan_csv(f"{path}/{leagues_file}")
+        get_lf(Dota2Files.LEAGUES, path)
         .filter(pl.col("tier").is_in(tier))
         .select([
             pl.col("leagueid").alias("league_id"),
@@ -18,7 +18,7 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
     )
 
     matches = (
-        pl.scan_csv(f"{path}/{metadata_file}")
+        get_lf(Dota2Files.METADATA, path)
         .drop_nans(subset="match_id")
         .filter(
             pl.col("patch").is_in(patches),

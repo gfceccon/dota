@@ -1,5 +1,7 @@
 import polars as pl
 from files import (
+    Dota2Files,
+    get_lf,
     objectives_file,
 )
 
@@ -21,7 +23,7 @@ def get_objectives(path: str) -> pl.LazyFrame:
     }
 
     objectives = (
-        pl.scan_csv(f"{path}/{objectives_file}")
+        get_lf(Dota2Files.OBJECTIVES, path)
         .with_columns([pl.col(f"obj_{col}") for col in cols if col != "match_id" and col != "type"] + [
             pl.col("type")
             .replace(obj_types)
