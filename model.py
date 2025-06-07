@@ -1,3 +1,5 @@
+import math
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -51,6 +53,8 @@ class Dota2Autoencoder(nn.Module):
 
         # Calcula a dimensão de entrada do modelo, para cada time
         self.input_dim = self.compute_input_dim()
+        if(verbose):
+            print(f"Input dimension: {self.input_dim}")
 
         self.encoder = self.create_encoder(verbose=verbose)
         self.decoder = self.create_encoder(decoder=True, verbose=verbose)
@@ -72,18 +76,12 @@ class Dota2Autoencoder(nn.Module):
             self.hidden_layers)
         dimension = self.input_dim if not decoder else self.latent_dim
         for _hidden in hidden_layers:
-            if verbose:
-                print(
-                    f"Adding layer with input dimension: {dimension}, output dimension: {_hidden}")
             layers.extend([
                 nn.Linear(dimension, _hidden, device=self.device),
                 nn.ReLU(),
                 nn.Dropout(self.dropout),
             ])
             dimension = _hidden
-        if verbose:
-            print(
-                f"Adding final layer with input dimension: {dimension}, output dimension: {self.latent_dim if not decoder else self.input_dim}")
         layers.append(
             nn.Linear(dimension, self.latent_dim if not decoder else self.input_dim, device=self.device))
         return nn.Sequential(*layers).to(self.device)
@@ -92,7 +90,6 @@ class Dota2Autoencoder(nn.Module):
                 radiant_bans: list[int], dire_bans: list[int],
                 radiant_hero_roles: list[list[int]], dire_hero_roles: list[list[int]],
                 radiant_stats: list[list[float]], dire_stats: list[list[float]],
-                verbose: bool = False
                 ) -> torch.Tensor:
 
         # Picks e bans
@@ -123,28 +120,32 @@ class Dota2Autoencoder(nn.Module):
         dire_hero_roles_feat: torch.Tensor = self.hero_role_embedding(
             dire_hero_roles_tensor)
 
-        # Stats são normalizados e convertidos em tensores
+        # Stats são convertidos em tensores
         radiant_stats_feat: list[torch.Tensor] = [torch.tensor(
             stats, device=self.device) for stats in radiant_stats]
         dire_stats_feat: list[torch.Tensor] = [torch.tensor(
             stats, device=self.device) for stats in dire_stats]
 
-        if (verbose):
-            print(
-                f"Radiant picks shape: {radiant_picks_feat.shape}, Dire picks shape: {dire_picks_feat.shape}")
-            print(
-                f"Radiant bans shape: {radiant_bans_feat.shape}, Dire bans shape: {dire_bans_feat.shape}")
 
-            for stats in radiant_hero_roles_feat:
-                print(f"Radiant Hero roles tensor shape: {stats.shape}")
-            for stats in radiant_stats_feat:
-                print(f"Radiant Stats tensor shape: {stats.shape}")
-            for stats in dire_hero_roles_feat:
-                print(f"Dire Hero roles tensor shape: {stats.shape}")
-            for stats in dire_stats_feat:
-                print(f"Dire Stats tensor shape: {stats.shape}")
+        # Debug: checa NaN/Inf em cada componente antes do flatten
+        def check_nan_inf(tensor, name):
+            if torch.isnan(tensor).any():
+                print(f"[DEBUG] {name} contém NaN")
+            if torch.isinf(tensor).any():
+                print(f"[DEBUG] {name} contém Inf")
 
-        # Flatten nested lists of tensors for stats and hero roles
+        check_nan_inf(radiant_picks_feat, 'radiant_picks_feat')
+        check_nan_inf(dire_picks_feat, 'dire_picks_feat')
+        check_nan_inf(radiant_bans_feat, 'radiant_bans_feat')
+        check_nan_inf(dire_bans_feat, 'dire_bans_feat')
+        check_nan_inf(radiant_hero_roles_feat, 'radiant_hero_roles_feat')
+        check_nan_inf(dire_hero_roles_feat, 'dire_hero_roles_feat')
+        for i, t in enumerate(radiant_stats_feat):
+            check_nan_inf(t, f'radiant_stats_feat[{i}]')
+        for i, t in enumerate(dire_stats_feat):
+            check_nan_inf(t, f'dire_stats_feat[{i}]')
+
+        # Flatten os tensores e concatena
         flat = torch.cat([
             radiant_picks_feat.view(-1),
             dire_picks_feat.view(-1),
@@ -155,9 +156,6 @@ class Dota2Autoencoder(nn.Module):
             torch.cat(radiant_stats_feat).view(-1),
             torch.cat(dire_stats_feat).view(-1)
         ]).unsqueeze(0)
-
-        if (verbose):
-            print(f"Flattened tensor shape: {flat.shape}")
 
         return flat
 
@@ -175,25 +173,31 @@ class Dota2Autoencoder(nn.Module):
                    radiant_bans: list[int], dire_bans: list[int],
                    radiant_hero_roles: list[list[int]], dire_hero_roles: list[list[int]],
                    radiant_stats: list[list[float]], dire_stats: list[list[float]],
-                   verbose: bool = False
-                   ) -> float:
+                   ):
         self.train()
         self.optimizer.zero_grad()
         original = self.flatten(radiant_picks, dire_picks,
                                 radiant_bans, dire_bans,
                                 radiant_hero_roles, dire_hero_roles,
-                                radiant_stats, dire_stats,
-                                verbose)
+                                radiant_stats, dire_stats,)
         latent, reconstructed = self.forward(original)
+        # Debug: checa se há NaN ou Inf nos tensores
+        assert not torch.isnan(original).any(), "original contém NaN"
+        assert not torch.isinf(original).any(), "original contém Inf"
+        assert not torch.isnan(reconstructed).any(), "reconstructed contém NaN"
+        assert not torch.isinf(reconstructed).any(), "reconstructed contém Inf"
         loss = self.loss(original, reconstructed)
         loss.backward()
         self.optimizer.step()
         self.loss_history.append(loss.item())
         return loss.item()
 
-    def train_data(self, training_df: pl.DataFrame, epochs: int = 10, verbose=False) -> None:
+    def train_data(self, training_df: pl.DataFrame, validation_df: pl.DataFrame, epochs: int = 10, verbose=False) -> None:
         for epoch in range(epochs):
             total_loss = 0.0
+            timer_start = time.time()
+            train_step_timer_start = 0
+            train_step_timer_end = 0
             for row in training_df.iter_rows(named=True):
                 radiant_picks = row['radiant_picks']
                 dire_picks = row['dire_picks']
@@ -204,30 +208,24 @@ class Dota2Autoencoder(nn.Module):
                 radiant_hero_roles = row['radiant_hero_roles']
                 dire_hero_roles = row['dire_hero_roles']
 
-                radiant_stats: list[list[float]] = row['radiant_stats']
-                dire_stats: list[list[float]] = row['dire_stats']
+                radiant_stats: list[list[float]] = row['radiant_stats_normalized']
+                dire_stats: list[list[float]] = row['dire_stats_normalized']
 
-                min_stats = np.array(row['min_stats'])
-                max_stats = np.array(row['max_stats'])
-
-                diff_stats = max_stats - min_stats
-                # Evita divisão por zero
-                diff_stats = np.where(diff_stats == 0, 1, diff_stats)
-
-                radiant_stats = [
-                    ((np.array(stats) - min_stats) / diff_stats).tolist() for stats in radiant_stats]
-                dire_stats = [((np.array(stats) - min_stats) /
-                               diff_stats).tolist() for stats in dire_stats]
-
+                train_step_timer_start += time.time()
                 loss = self.train_step(
                     radiant_picks, dire_picks, radiant_bans, dire_bans,
                     radiant_hero_roles, dire_hero_roles,
                     radiant_stats, dire_stats,
-                    verbose
                 )
+                
+                assert math.isnan(loss) == False, "Loss is NaN, check your data and model configuration."
+                train_step_timer_end += time.time()
                 total_loss += loss
+            timer_end = time.time()
             avg_loss = total_loss / len(training_df)
             if (verbose):
                 print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}')
+                print(f'Time taken: {timer_end - timer_start:.2f} seconds')
+                print(f'Train step average time: {(train_step_timer_end - train_step_timer_start) / len(training_df):.4f} seconds')
             elif (epoch % 10 == 0):
                 print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}')

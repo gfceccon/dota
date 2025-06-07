@@ -29,11 +29,24 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
             pl.when(pl.col("team").eq(1) & pl.col("pick").eq(False)).then(
                 pl.col("hero_id") + 1).drop_nulls().alias("dire_bans"),
 
-            pl.concat_list([pl.col(f"{col}").max()
-                           for col in players_cols]).alias("max_stats"),
+            *[
+                pl.when(pl.col("team").eq(team_id) &
+                        pl.col("pick").eq(True))
+                .then(
+                    pl.concat_list(
+                        [
+                            (pl.col(f"{stat}") * 1.0 - pl.col(f"{stat}").min()) /
+                            pl.when((pl.col(f"{stat}").max() - pl.col(f"{stat}").min()) != 0)
+                            .then(pl.col(f"{stat}").max() - pl.col(f"{stat}").min())
+                            .otherwise(1.0)
+                            for stat in players_cols]
+                    ))
+                .drop_nulls()
+                .drop_nans()
+                .alias(f"{team_name}_stats_normalized")
+                for team_id, team_name in [(0, "radiant"), (1, "dire")]
+            ],
 
-            pl.concat_list([pl.col(f"{col}").min()
-                           for col in players_cols]).alias("min_stats"),
         )
         .filter(
             (~pl.col("radiant_stats_null").list.any()) &
@@ -43,6 +56,20 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
             (pl.col("dire_picks").list.len() == 5) &
             (pl.col("dire_bans").list.len() == 7)
         )
+        # .with_columns(
+        #     pl.when(pl.col("radiant_stats").is_not_null())
+        #     .then(
+        #         pl.col("radiant_stats").list.eval(
+        #             (pl.element() - pl.col("min_stats")) / (pl.col("max_stats") - pl.col("min_stats"))
+        #         ))
+        #     .alias("radiant_stats_normalized"),
+        #     pl.when(pl.col("dire_stats").is_not_null())
+        #     .then(
+        #         pl.col("dire_stats").list.eval(
+        #             (pl.element() - pl.col("min_stats")) / (pl.col("max_stats") - pl.col("min_stats"))
+        #         ))
+        #     .alias("dire_stats_normalized"),
+        # )
     )
 
     return dataset, players_cols, hero_cols
@@ -69,7 +96,9 @@ def get_dataset(path: str, years: tuple[int, int] = (2023, 2024), tier: list[str
             "radiant_stats", "dire_stats",
             "radiant_picks", "dire_picks",
             "radiant_bans", "dire_bans",
-            "min_stats", "max_stats",)
+            #"min_stats", "max_stats",
+            "radiant_stats_normalized", "dire_stats_normalized"
+        )
         .collect())
     print("Dataset carregado e pré-processado com sucesso!")
     return dataset, games_cols, hero_cols

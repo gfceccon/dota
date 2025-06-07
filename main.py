@@ -24,7 +24,6 @@ def main():
     n_hero_stats = len(hero_cols)
     n_player_stats = len(player_cols)
     print (f"Total Hero Stats: {n_hero_stats}, Total Player Stats: {n_player_stats}")
-    print(f"Total Roles: {n_roles}, Total Heroes: {n_heroes}")
     print(f"Total Heroes: {n_heroes}, Total Roles: {len(dict_roles)}")
 
     if("--save" in sys.argv):
@@ -40,16 +39,19 @@ def main():
         n_players=5,
         n_bans=7,
         latent_dim=32,
-        hidden_layers=[128, 64],
+        hidden_layers=[512, 128, 64],
         dropout=0.2,
         learning_rate=0.001,
         verbose=True
     )
     
+    train_data = dataset.sample(fraction=0.9, seed=42, shuffle=True)
+    validation_data = dataset.sample(fraction=0.1, seed=42, shuffle=True)
+    
+    print(f"Training data size: {train_data.shape}, Validation data size: {validation_data.shape}")
+    
     print("Training Dota2 Autoencoder...")
-    
-    autoencoder.train_data(dataset, 10, verbose=False)
-    
+    autoencoder.train_data(training_df=train_data, validation_df=validation_data, epochs=50, verbose=True)
     print("Training completed.")
 if __name__ == "__main__":
     main()
