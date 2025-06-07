@@ -145,16 +145,20 @@ class Dota2Autoencoder(nn.Module):
         for i, t in enumerate(dire_stats_feat):
             check_nan_inf(t, f'dire_stats_feat[{i}]')
 
-        # Flatten os tensores e concatena
+        # Otimização: converte stats para um único tensor 2D antes do flatten
+        radiant_stats_tensor = torch.tensor(radiant_stats, device=self.device)
+        dire_stats_tensor = torch.tensor(dire_stats, device=self.device)
+
+        # Otimização: usa .reshape(-1) ao invés de .view(-1) para maior robustez
         flat = torch.cat([
-            radiant_picks_feat.view(-1),
-            dire_picks_feat.view(-1),
-            radiant_bans_feat.view(-1),
-            dire_bans_feat.view(-1),
-            radiant_hero_roles_feat.view(-1),
-            dire_hero_roles_feat.view(-1),
-            torch.cat(radiant_stats_feat).view(-1),
-            torch.cat(dire_stats_feat).view(-1)
+            radiant_picks_feat.reshape(-1),
+            dire_picks_feat.reshape(-1),
+            radiant_bans_feat.reshape(-1),
+            dire_bans_feat.reshape(-1),
+            radiant_hero_roles_feat.reshape(-1),
+            dire_hero_roles_feat.reshape(-1),
+            radiant_stats_tensor.reshape(-1),
+            dire_stats_tensor.reshape(-1)
         ]).unsqueeze(0)
 
         return flat
@@ -195,9 +199,11 @@ class Dota2Autoencoder(nn.Module):
     def train_data(self, training_df: pl.DataFrame, validation_df: pl.DataFrame, epochs: int = 10, verbose=False) -> None:
         for epoch in range(epochs):
             total_loss = 0.0
+            total_val_loss = 0.0
             timer_start = time.time()
             train_step_timer_start = 0
             train_step_timer_end = 0
+            # Treinamento
             for row in training_df.iter_rows(named=True):
                 radiant_picks = row['radiant_picks']
                 dire_picks = row['dire_picks']
@@ -221,11 +227,72 @@ class Dota2Autoencoder(nn.Module):
                 assert math.isnan(loss) == False, "Loss is NaN, check your data and model configuration."
                 train_step_timer_end += time.time()
                 total_loss += loss
+            # Validação
+            with torch.no_grad():
+                for row in validation_df.iter_rows(named=True):
+                    radiant_picks = row['radiant_picks']
+                    dire_picks = row['dire_picks']
+                    radiant_bans = row['radiant_bans']
+                    dire_bans = row['dire_bans']
+                    radiant_hero_roles = row['radiant_hero_roles']
+                    dire_hero_roles = row['dire_hero_roles']
+                    radiant_stats: list[list[float]] = row['radiant_stats_normalized']
+                    dire_stats: list[list[float]] = row['dire_stats_normalized']
+                    original = self.flatten(
+                        radiant_picks, dire_picks, radiant_bans, dire_bans,
+                        radiant_hero_roles, dire_hero_roles, radiant_stats, dire_stats)
+                    _, reconstructed = self.forward(original)
+                    val_loss = self.loss(original, reconstructed).item()
+                    total_val_loss += val_loss
             timer_end = time.time()
             avg_loss = total_loss / len(training_df)
+            avg_val_loss = total_val_loss / len(validation_df)
             if (verbose):
-                print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}')
+                print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                 print(f'Time taken: {timer_end - timer_start:.2f} seconds')
                 print(f'Train step average time: {(train_step_timer_end - train_step_timer_start) / len(training_df):.4f} seconds')
             elif (epoch % 10 == 0):
-                print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}')
+                print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+
+    def save_model(self, path: str):
+        """Salva os pesos do modelo e hiperparâmetros essenciais."""
+        checkpoint = {
+            'state_dict': self.state_dict(),
+            'model_args': {
+                'hero_pick_embedding_dim': self.hero_embedding_dim,
+                'hero_role_embedding_dim': self.hero_role_embedding_dim,
+                'n_player_stats': self.n_player_stats,
+                'n_roles': self.n_roles,
+                'n_heroes': self.n_heroes,
+                'n_players': self.n_players,
+                'n_bans': self.n_bans,
+                'latent_dim': self.latent_dim,
+                'hidden_layers': self.hidden_layers,
+                'dropout': self.dropout,
+                'learning_rate': self.learning_rate
+            }
+        }
+        torch.save(checkpoint, path)
+        print(f"Modelo salvo em {path}")
+
+    @classmethod
+    def load_model(cls, path: str, map_location=None, **override_args):
+        """Carrega o modelo salvo e retorna uma instância pronta para uso."""
+        checkpoint = torch.load(path, map_location=map_location)
+        model_args = checkpoint['model_args']
+        model_args.update(override_args)  # permite sobrescrever argumentos
+        model = cls(**model_args)
+        model.load_state_dict(checkpoint['state_dict'])
+        model.eval()
+        print(f"Modelo carregado de {path}")
+        return model
+
+    def save_loss_history(self, path: str):
+        """Salva o histórico de loss em um arquivo texto ou csv."""
+        import csv
+        with open(path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['loss'])
+            for loss in self.loss_history:
+                writer.writerow([loss])
+        print(f"Histórico de loss salvo em {path}")

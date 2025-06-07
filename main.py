@@ -1,12 +1,7 @@
 import kagglehub
-import polars as pl
-import numpy as np
-import json
-import torch
 from dataset import get_dataset, save_dataset
 from heroes import get_heroes
 from model import Dota2Autoencoder
-from typing import Dict, List, Tuple
 import sys
 
 
@@ -28,6 +23,10 @@ def main():
 
     if("--save" in sys.argv):
         save_dataset(dataset.head())
+        return
+    
+    if("--save-all" in sys.argv):
+        save_dataset(dataset, output_path="./tmp/DATASET_FULL.json")
         return
     
     autoencoder = Dota2Autoencoder(
@@ -52,6 +51,9 @@ def main():
     
     print("Training Dota2 Autoencoder...")
     autoencoder.train_data(training_df=train_data, validation_df=validation_data, epochs=50, verbose=True)
+    autoencoder.save_model("./tmp/dota2_autoencoder.h5")
+    autoencoder.save_loss_history("./tmp/dota2_autoencoder_loss_history.csv")
+    print("Model saved to ./tmp/dota2_autoencoder.h5")
     print("Training completed.")
 if __name__ == "__main__":
     main()
