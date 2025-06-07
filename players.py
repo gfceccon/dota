@@ -58,7 +58,6 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
             (pl.col("hero_id") + 1).alias("hero_id"),
 
 
-            # Team-based stats assignment using dictionary comprehension
             *[
                 pl.when(pl.col("pick_team").eq(team_id) &
                         pl.col("pick_is_pick").eq(True))
