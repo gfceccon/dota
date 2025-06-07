@@ -13,7 +13,7 @@ class Dota2Autoencoder(nn.Module):
         hero_pick_embedding_dim: int,
         hero_role_embedding_dim: int,
         n_player_stats: int,
-        n_roles: int,
+        dict_roles: dict[str, int],
         n_heroes: int,
         n_players: int = 10,
         n_bans: int = 14,
@@ -34,13 +34,13 @@ class Dota2Autoencoder(nn.Module):
         self.n_players = n_players
         self.n_bans = n_bans
         self.n_picks = n_players + n_bans
-        self.n_roles = n_roles
+        self.dict_roles = dict_roles
 
         # Camadas de embedding para heróis, bans e estatísticas
         self.hero_pick_embedding = nn.Embedding(
             n_heroes, hero_pick_embedding_dim, device=self.device)
         self.hero_role_embedding = nn.Embedding(
-            self.n_roles, hero_role_embedding_dim, device=self.device)
+            2, hero_role_embedding_dim, device=self.device)
 
         # Dimensões e hiperparâmetros do modelo
         self.latent_dim = latent_dim
@@ -53,7 +53,7 @@ class Dota2Autoencoder(nn.Module):
 
         # Calcula a dimensão de entrada do modelo, para cada time
         self.input_dim = self.compute_input_dim()
-        if(verbose):
+        if (verbose):
             print(f"Input dimension: {self.input_dim}")
 
         self.encoder = self.create_encoder(verbose=verbose)
@@ -66,7 +66,8 @@ class Dota2Autoencoder(nn.Module):
         picks_dim = 2 * self.n_players * self.hero_embedding_dim
         bans_dim = 2 * self.n_bans * self.hero_embedding_dim
         stats_dim = 2 * self.n_players * self.n_player_stats
-        hero_role_dim = 2 * self.n_players * self.n_roles * self.hero_role_embedding_dim
+        hero_role_dim = 2 * self.n_players * \
+            len(self.dict_roles) * self.hero_role_embedding_dim
         self.input_dim = picks_dim + bans_dim + stats_dim + hero_role_dim
         return self.input_dim
 
@@ -77,8 +78,7 @@ class Dota2Autoencoder(nn.Module):
         dimension = self.input_dim if not decoder else self.latent_dim
         for _hidden in hidden_layers:
             layers.extend([
-                nn.Linear(dimension, _hidden, device=self.device),
-                nn.ReLU(),
+                nn.Linear(dimension, _hidden, device=self.device), nn.ReLU(),
                 nn.Dropout(self.dropout),
             ])
             dimension = _hidden
@@ -102,12 +102,16 @@ class Dota2Autoencoder(nn.Module):
         dire_bans_feat: torch.Tensor = self.hero_pick_embedding(
             torch.tensor(dire_bans, device=self.device))
 
-        def pad_roles(roles):
-            return roles + [0] * (self.n_roles - len(roles))
+        def fill_hero_roles(roles: list[int]) -> list[int]:
+            roles_ = [0] * len(self.dict_roles)
+            for role in roles:
+                if role in self.dict_roles:
+                    roles_[self.dict_roles[role]] = 1
+            return roles_
 
-        radiant_hero_roles_padded = [pad_roles(roles)
+        radiant_hero_roles_padded = [fill_hero_roles(roles)
                                      for roles in radiant_hero_roles]
-        dire_hero_roles_padded = [pad_roles(roles)
+        dire_hero_roles_padded = [fill_hero_roles(roles)
                                   for roles in dire_hero_roles]
 
         radiant_hero_roles_tensor = torch.tensor(
@@ -120,32 +124,6 @@ class Dota2Autoencoder(nn.Module):
         dire_hero_roles_feat: torch.Tensor = self.hero_role_embedding(
             dire_hero_roles_tensor)
 
-        # Stats são convertidos em tensores
-        radiant_stats_feat: list[torch.Tensor] = [torch.tensor(
-            stats, device=self.device) for stats in radiant_stats]
-        dire_stats_feat: list[torch.Tensor] = [torch.tensor(
-            stats, device=self.device) for stats in dire_stats]
-
-
-        # Debug: checa NaN/Inf em cada componente antes do flatten
-        def check_nan_inf(tensor, name):
-            if torch.isnan(tensor).any():
-                print(f"[DEBUG] {name} contém NaN")
-            if torch.isinf(tensor).any():
-                print(f"[DEBUG] {name} contém Inf")
-
-        check_nan_inf(radiant_picks_feat, 'radiant_picks_feat')
-        check_nan_inf(dire_picks_feat, 'dire_picks_feat')
-        check_nan_inf(radiant_bans_feat, 'radiant_bans_feat')
-        check_nan_inf(dire_bans_feat, 'dire_bans_feat')
-        check_nan_inf(radiant_hero_roles_feat, 'radiant_hero_roles_feat')
-        check_nan_inf(dire_hero_roles_feat, 'dire_hero_roles_feat')
-        for i, t in enumerate(radiant_stats_feat):
-            check_nan_inf(t, f'radiant_stats_feat[{i}]')
-        for i, t in enumerate(dire_stats_feat):
-            check_nan_inf(t, f'dire_stats_feat[{i}]')
-
-        # Otimização: converte stats para um único tensor 2D antes do flatten
         radiant_stats_tensor = torch.tensor(radiant_stats, device=self.device)
         dire_stats_tensor = torch.tensor(dire_stats, device=self.device)
 
@@ -214,7 +192,8 @@ class Dota2Autoencoder(nn.Module):
                 radiant_hero_roles = row['radiant_hero_roles']
                 dire_hero_roles = row['dire_hero_roles']
 
-                radiant_stats: list[list[float]] = row['radiant_stats_normalized']
+                radiant_stats: list[list[float]
+                                    ] = row['radiant_stats_normalized']
                 dire_stats: list[list[float]] = row['dire_stats_normalized']
 
                 train_step_timer_start += time.time()
@@ -223,8 +202,9 @@ class Dota2Autoencoder(nn.Module):
                     radiant_hero_roles, dire_hero_roles,
                     radiant_stats, dire_stats,
                 )
-                
-                assert math.isnan(loss) == False, "Loss is NaN, check your data and model configuration."
+
+                assert math.isnan(
+                    loss) == False, "Loss is NaN, check your data and model configuration."
                 train_step_timer_end += time.time()
                 total_loss += loss
             # Validação
@@ -236,8 +216,10 @@ class Dota2Autoencoder(nn.Module):
                     dire_bans = row['dire_bans']
                     radiant_hero_roles = row['radiant_hero_roles']
                     dire_hero_roles = row['dire_hero_roles']
-                    radiant_stats: list[list[float]] = row['radiant_stats_normalized']
-                    dire_stats: list[list[float]] = row['dire_stats_normalized']
+                    radiant_stats: list[list[float]
+                                        ] = row['radiant_stats_normalized']
+                    dire_stats: list[list[float]
+                                     ] = row['dire_stats_normalized']
                     original = self.flatten(
                         radiant_picks, dire_picks, radiant_bans, dire_bans,
                         radiant_hero_roles, dire_hero_roles, radiant_stats, dire_stats)
@@ -248,11 +230,14 @@ class Dota2Autoencoder(nn.Module):
             avg_loss = total_loss / len(training_df)
             avg_val_loss = total_val_loss / len(validation_df)
             if (verbose):
-                print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+                print(
+                    f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                 print(f'Time taken: {timer_end - timer_start:.2f} seconds')
-                print(f'Train step average time: {(train_step_timer_end - train_step_timer_start) / len(training_df):.4f} seconds')
+                print(
+                    f'Train step average time: {(train_step_timer_end - train_step_timer_start) / len(training_df):.4f} seconds')
             elif (epoch % 10 == 0):
-                print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+                print(
+                    f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
 
     def save_model(self, path: str):
         """Salva os pesos do modelo e hiperparâmetros essenciais."""

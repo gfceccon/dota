@@ -17,6 +17,11 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
         "gold_per_min", "xp_per_min",
         "hero_damage", "tower_damage", "hero_healing",
         "roshan_kills", "tower_kills",
+        "towers_killed", "roshans_killed",
+        "last_hits", "denies",
+        "aghanims_scepter", "aghanims_shard",
+        "total_gold", "total_xp",
+        "purchase_gem", "purchase_rapier",
     ]
 
     _picks_cols = [
@@ -25,12 +30,10 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
         "hero_id",
         "order",
     ]
-
-    players_cols = ["player_gold_per_min", "player_xp_per_min",
-                    "player_kills", "player_deaths", "player_assists",
-                    "player_obs_placed", "player_sen_placed",
-                    "player_hero_damage", "player_tower_damage", "player_hero_healing",]
-    hero_cols = ["primary_attribute", "attack_type", "roles", ]
+    
+    picks_cols = ["pick", "team", "hero_id", "hero_name", "order"]
+    
+    players_cols = [f"player_{col}" for col in _players_cols]
 
     players = (
         pl.scan_csv(f"{path}/{players_file}")
@@ -43,7 +46,7 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
         .drop_nulls(subset="team")
         .select([pl.col(col).alias(f"pick_{col}") for col in _picks_cols] + ["match_id"])
     )
-    heroes, _, _ = get_heroes(path)
+    heroes, hero_cols, _, _ = get_heroes(path)
     games = (
         matches
         .join(picks, on="match_id", how="inner")
@@ -57,18 +60,6 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
             pl.col("pick_order").alias("order"),
             (pl.col("hero_id") + 1).alias("hero_id"),
 
-
-            *[
-                pl.when(pl.col("pick_team").eq(team_id) &
-                        pl.col("pick_is_pick").eq(True))
-                .then(
-                    pl.concat_list(
-                        [pl.col(f"{stat}") * 1.0 for stat in players_cols]
-                    ).drop_nulls())
-                .otherwise(pl.lit(None))
-                .alias(f"{team_name}_stats")
-                for team_id, team_name in [(0, "radiant"), (1, "dire")]
-            ],
             *[
                 pl.when(pl.col("pick_team").eq(team_id) &
                         pl.col("pick_is_pick").eq(True))
@@ -84,39 +75,33 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
                 pl.when(pl.col("pick_team").eq(team_id) &
                         pl.col("pick_is_pick").eq(True))
                 .then(
-                    pl.concat_list(
-                        [f"{stat}" for stat in hero_cols]
-                    ))
+                    pl.col("roles"))
                 .otherwise(pl.lit(None))
                 .alias(f"{team_name}_hero_roles")
                 for team_id, team_name in [(0, "radiant"), (1, "dire")]
             ],
+            
+            *[pl.col(col).cast(pl.Float64, strict=False).fill_null(strategy="zero").alias(col) for col in players_cols],
         ])
         .select([
             "match_id",
-            "hero_id",
-            "hero_name",
-            "team",
-            "order",
-            "pick",
             "radiant_hero_roles",
             "dire_hero_roles",
-            *players_cols,
-            "radiant_stats",
-            "dire_stats",
             "radiant_stats_null",
             "dire_stats_null",
+            *picks_cols,
+            *hero_cols,
+            *players_cols,
         ])
     )
 
     return games, players_cols, hero_cols
+
 
 if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
     path = kagglehub.dataset_download(dataset_name)
     matches = pl.scan_csv(f"{path}/{metadata_file}").select(["match_id"])
     players, player_cols, hero_cols = get_players_draft(path, matches)
-    
-    print(f"Players DataFrame: {players.filter(pl.col("pick") == True).filter(pl.col("radiant_stats_len") == True).collect().head()}")
-    print(f"Player Columns: {player_cols}")
-    print(f"Hero Columns: {hero_cols}")
+
+    print(f"Players DataFrame: {players.collect().head()}")
