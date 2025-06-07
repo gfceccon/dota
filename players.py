@@ -1,9 +1,8 @@
 import kagglehub
 import polars as pl
 from files import (
-    players_file,
-    picks_bans_file,
-    metadata_file
+    Dota2Files,
+    get_lf,
 )
 from heroes import get_heroes
 
@@ -36,13 +35,13 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
     players_cols = [f"player_{col}" for col in _players_cols]
 
     players = (
-        pl.scan_csv(f"{path}/{players_file}")
+        get_lf(Dota2Files.PLAYERS, path)
         .select([pl.col(col).alias(f"player_{col}") for col in _players_cols] + ["match_id"])
         .with_columns(pl.col("player_hero_id").alias("hero_id"))
     )
 
     picks = (
-        pl.scan_csv(f"{path}/{picks_bans_file}")
+        get_lf(Dota2Files.PICKS_BANS, path)
         .drop_nulls(subset="team")
         .select([pl.col(col).alias(f"pick_{col}") for col in _picks_cols] + ["match_id"])
     )
@@ -75,7 +74,7 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
                 pl.when(pl.col("pick_team").eq(team_id) &
                         pl.col("pick_is_pick").eq(True))
                 .then(
-                    pl.col("roles"))
+                    pl.col("roles_vector"))
                 .otherwise(pl.lit(None))
                 .alias(f"{team_name}_hero_roles")
                 for team_id, team_name in [(0, "radiant"), (1, "dire")]
@@ -101,7 +100,7 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
 if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
     path = kagglehub.dataset_download(dataset_name)
-    matches = pl.scan_csv(f"{path}/{metadata_file}").select(["match_id"])
+    matches = get_lf(Dota2Files.METADATA, path).select(["match_id"])
     players, player_cols, hero_cols = get_players_draft(path, matches)
 
     print(f"Players DataFrame: {players.collect().head()}")

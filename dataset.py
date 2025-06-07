@@ -72,14 +72,14 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
         .filter(
             (~pl.col("radiant_stats_null").list.any()) &
             (~pl.col("dire_stats_null").list.any()) &
-            
+
             (pl.col("dire_hero_stats_normalized").list.len() == 5) &
             (pl.col("radiant_hero_stats_normalized").list.len() == 5) &
-            
-            
+
+
             (pl.col("radiant_picks").list.len() == 5) &
             (pl.col("dire_picks").list.len() == 5) &
-            
+
             (pl.col("radiant_bans").list.len() == 7) &
             (pl.col("dire_bans").list.len() == 7)
         )
@@ -89,14 +89,14 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
 
 
 def get_dataset(
-        path: str, years: tuple[int, int] = (2023, 2024),
+        path: str, year: int = 2024,
         tier: list[str] = ['professional'],
         duration: tuple[int, int] = (30, 120),
         specific_patches: list[int] = []
 ) -> tuple[pl.DataFrame, list[str], list[str]]:
     print(f"Carregando dataset...")
     print(f"Tier: {tier}, Duração: {duration[0]}-{duration[1]} minutos")
-    patches = get_patches(path, begin_year=years[0], end_year=years[1])
+    patches = get_patches(path, year)
     print("Patches:")
     if specific_patches:
         for patch_id in specific_patches:
@@ -124,7 +124,8 @@ def get_dataset(
             "radiant_stats_normalized", "dire_stats_normalized",
             "radiant_hero_stats_normalized", "dire_hero_stats_normalized"
         )
-        .collect())
+        .collect()
+    )
     print("Dataset carregado e pré-processado com sucesso!")
     return dataset, games_cols, hero_cols
 
@@ -133,20 +134,14 @@ def save_dataset(dataset: pl.DataFrame, output_path: str = "./tmp/DATASET.json")
     print(f"Salvando dataset em {output_path}...")
     dataset.write_json(output_path)
     print("Dataset salvo com sucesso!")
-    
+
+
 if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
     path = kagglehub.dataset_download(dataset_name)
-    
-    # Exemplo de uso
-    # dataset, player_cols, hero_cols = get_dataset(
-    #     path,
-    #     years=(2023, 2024),
-    #     tier=['professional'],
-    #     duration=(30, 120),
-    #     specific_patches=[54]  # Patch 6.7
-    # )
-    matches = get_matches(path, patches=[54], tier=['professional'], min_duration=30 * 60, max_duration=120 * 60)
+
+    matches = get_matches(path, patches=[54], tier=[
+                          'professional'], min_duration=30 * 60, max_duration=120 * 60)
     games, players_cols, hero_cols = get_players_draft(path, matches)
-    
+
     print(f"Schema: {[x for x, y in zip(games.collect_schema().names(), games.collect_schema().dtypes()) if y.is_numeric() == False]}")

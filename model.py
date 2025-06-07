@@ -1,10 +1,9 @@
-import math
+from typing import Any
+import torch.nn as nn
+import polars as pl
 import time
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import polars as pl
+import csv
 
 
 class Dota2Autoencoder(nn.Module):
@@ -28,13 +27,16 @@ class Dota2Autoencoder(nn.Module):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
 
-        # Número de heróis, estatísticas, jogadores e bans
+        # Número de heróis, estatísticas, jogadores, picks e bans
         self.n_heroes = n_heroes
         self.n_player_stats = n_player_stats
         self.n_players = n_players
         self.n_bans = n_bans
         self.n_picks = n_players + n_bans
+        
+        # Dicionário de roles
         self.dict_roles = dict_roles
+        self.n_roles = len(dict_roles)
 
         # Camadas de embedding para heróis, bans e estatísticas
         self.hero_pick_embedding = nn.Embedding(
@@ -47,7 +49,8 @@ class Dota2Autoencoder(nn.Module):
         self.hidden_layers = hidden_layers
         self.learning_rate = learning_rate
         self.dropout = dropout
-
+        
+        # Dimensões de embedding para picks e roles
         self.hero_embedding_dim = hero_pick_embedding_dim
         self.hero_role_embedding_dim = hero_role_embedding_dim
 
@@ -56,18 +59,23 @@ class Dota2Autoencoder(nn.Module):
         if (verbose):
             print(f"Input dimension: {self.input_dim}")
 
+        # Inicializa as camadas do modelo
         self.encoder = self.create_encoder(verbose=verbose)
         self.decoder = self.create_encoder(decoder=True, verbose=verbose)
+        
         self.optimizer = torch.optim.Adam(self.parameters(), learning_rate)
         self.loss = nn.MSELoss()
+        
+        # Históricos de loss
         self.loss_history = []
+        self.avg_history = []
+        self.avg_eval_history = []
 
     def compute_input_dim(self):
         picks_dim = 2 * self.n_players * self.hero_embedding_dim
         bans_dim = 2 * self.n_bans * self.hero_embedding_dim
         stats_dim = 2 * self.n_players * self.n_player_stats
-        hero_role_dim = 2 * self.n_players * \
-            len(self.dict_roles) * self.hero_role_embedding_dim
+        hero_role_dim = 2 * self.n_players * self.n_roles * self.hero_role_embedding_dim
         self.input_dim = picks_dim + bans_dim + stats_dim + hero_role_dim
         return self.input_dim
 
@@ -86,11 +94,20 @@ class Dota2Autoencoder(nn.Module):
             nn.Linear(dimension, self.latent_dim if not decoder else self.input_dim, device=self.device))
         return nn.Sequential(*layers).to(self.device)
 
-    def flatten(self, radiant_picks: list[int], dire_picks: list[int],
-                radiant_bans: list[int], dire_bans: list[int],
-                radiant_hero_roles: list[list[int]], dire_hero_roles: list[list[int]],
-                radiant_stats: list[list[float]], dire_stats: list[list[float]],
-                ) -> torch.Tensor:
+    def flatten(self, data: dict[str, Any]) -> torch.Tensor:
+        
+        radiant_picks = data['radiant_picks']
+        dire_picks = data['dire_picks']
+
+        radiant_bans = data['radiant_bans']
+        dire_bans = data['dire_bans']
+
+        radiant_hero_roles = data['radiant_hero_roles']
+        dire_hero_roles = data['dire_hero_roles']
+
+        radiant_stats: list[list[float]
+                            ] = data['radiant_stats_normalized']
+        dire_stats: list[list[float]] = data['dire_stats_normalized']
 
         # Picks e bans
         radiant_picks_feat: torch.Tensor = self.hero_pick_embedding(
@@ -102,22 +119,10 @@ class Dota2Autoencoder(nn.Module):
         dire_bans_feat: torch.Tensor = self.hero_pick_embedding(
             torch.tensor(dire_bans, device=self.device))
 
-        def fill_hero_roles(roles: list[int]) -> list[int]:
-            roles_ = [0] * len(self.dict_roles)
-            for role in roles:
-                if role in self.dict_roles:
-                    roles_[self.dict_roles[role]] = 1
-            return roles_
-
-        radiant_hero_roles_padded = [fill_hero_roles(roles)
-                                     for roles in radiant_hero_roles]
-        dire_hero_roles_padded = [fill_hero_roles(roles)
-                                  for roles in dire_hero_roles]
-
         radiant_hero_roles_tensor = torch.tensor(
-            radiant_hero_roles_padded, dtype=torch.long, device=self.device)
+            radiant_hero_roles, dtype=torch.long, device=self.device)
         dire_hero_roles_tensor = torch.tensor(
-            dire_hero_roles_padded, dtype=torch.long, device=self.device)
+            dire_hero_roles, dtype=torch.long, device=self.device)
 
         radiant_hero_roles_feat: torch.Tensor = self.hero_role_embedding(
             radiant_hero_roles_tensor)
@@ -147,100 +152,78 @@ class Dota2Autoencoder(nn.Module):
         reconstructed = self.decoder(latent)
         return latent, reconstructed
 
-    def encode(self, *args, **kwargs) -> torch.Tensor:
-        latent, _ = self.forward(*args, **kwargs)
-        return latent
-
-    def train_step(self, radiant_picks: list[int], dire_picks: list[int],
-                   radiant_bans: list[int], dire_bans: list[int],
-                   radiant_hero_roles: list[list[int]], dire_hero_roles: list[list[int]],
-                   radiant_stats: list[list[float]], dire_stats: list[list[float]],
-                   ):
-        self.train()
-        self.optimizer.zero_grad()
-        original = self.flatten(radiant_picks, dire_picks,
-                                radiant_bans, dire_bans,
-                                radiant_hero_roles, dire_hero_roles,
-                                radiant_stats, dire_stats,)
-        latent, reconstructed = self.forward(original)
-        # Debug: checa se há NaN ou Inf nos tensores
-        assert not torch.isnan(original).any(), "original contém NaN"
-        assert not torch.isinf(original).any(), "original contém Inf"
-        assert not torch.isnan(reconstructed).any(), "reconstructed contém NaN"
-        assert not torch.isinf(reconstructed).any(), "reconstructed contém Inf"
-        loss = self.loss(original, reconstructed)
-        loss.backward()
-        self.optimizer.step()
-        self.loss_history.append(loss.item())
-        return loss.item()
+    def encode(self, data: dict[str, Any]) -> tuple[torch.Tensor, torch.Tensor]:
+        tensor = self.flatten(data)
+        latent, reconstructed = self.forward(tensor)
+        return latent, reconstructed
 
     def train_data(self, training_df: pl.DataFrame, validation_df: pl.DataFrame, epochs: int = 10, verbose=False) -> None:
         for epoch in range(epochs):
             total_loss = 0.0
             total_val_loss = 0.0
             timer_start = time.time()
-            train_step_timer_start = 0
-            train_step_timer_end = 0
-            # Treinamento
+            
+            self.train()
+            # Treinamento do modelo
             for row in training_df.iter_rows(named=True):
-                radiant_picks = row['radiant_picks']
-                dire_picks = row['dire_picks']
-
-                radiant_bans = row['radiant_bans']
-                dire_bans = row['dire_bans']
-
-                radiant_hero_roles = row['radiant_hero_roles']
-                dire_hero_roles = row['dire_hero_roles']
-
-                radiant_stats: list[list[float]
-                                    ] = row['radiant_stats_normalized']
-                dire_stats: list[list[float]] = row['dire_stats_normalized']
-
-                train_step_timer_start += time.time()
-                loss = self.train_step(
-                    radiant_picks, dire_picks, radiant_bans, dire_bans,
-                    radiant_hero_roles, dire_hero_roles,
-                    radiant_stats, dire_stats,
-                )
-
-                assert math.isnan(
-                    loss) == False, "Loss is NaN, check your data and model configuration."
-                train_step_timer_end += time.time()
-                total_loss += loss
-            # Validação
+                data = self.flatten(row)
+                
+                self.optimizer.zero_grad()
+                latent, reconstructed = self.forward(data)
+                loss = self.loss(data, reconstructed)
+                loss.backward()
+                self.optimizer.step()
+                self.loss_history.append(loss.item())
+                
+                total_loss += loss.item()
+            # Validação do modelo
+            self.eval()
             with torch.no_grad():
                 for row in validation_df.iter_rows(named=True):
-                    radiant_picks = row['radiant_picks']
-                    dire_picks = row['dire_picks']
-                    radiant_bans = row['radiant_bans']
-                    dire_bans = row['dire_bans']
-                    radiant_hero_roles = row['radiant_hero_roles']
-                    dire_hero_roles = row['dire_hero_roles']
-                    radiant_stats: list[list[float]
-                                        ] = row['radiant_stats_normalized']
-                    dire_stats: list[list[float]
-                                     ] = row['dire_stats_normalized']
-                    original = self.flatten(
-                        radiant_picks, dire_picks, radiant_bans, dire_bans,
-                        radiant_hero_roles, dire_hero_roles, radiant_stats, dire_stats)
+                    original = self.flatten(row)
                     _, reconstructed = self.forward(original)
                     val_loss = self.loss(original, reconstructed).item()
                     total_val_loss += val_loss
+                    
+            # Fim da época   
             timer_end = time.time()
+            
+            # Calcula a média de loss para a época
             avg_loss = total_loss / len(training_df)
             avg_val_loss = total_val_loss / len(validation_df)
+            
+            # Armazena os resultados médios
+            self.avg_history.append(avg_loss)
+            self.avg_eval_history.append(avg_val_loss)
+            
+            # Exibe os resultados
             if (verbose):
                 print(
                     f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                 print(f'Time taken: {timer_end - timer_start:.2f} seconds')
-                print(
-                    f'Train step average time: {(train_step_timer_end - train_step_timer_start) / len(training_df):.4f} seconds')
             elif (epoch % 10 == 0):
                 print(
                     f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
 
+    def test_model(self, test_df: pl.DataFrame) -> float:
+        self.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for row in test_df.iter_rows(named=True):
+                original = self.flatten(row)
+                latent, reconstructed = self.forward(original)
+                # Supondo que a tarefa é reconstrução, a acurácia pode ser definida como
+                # quão próximo o reconstruído está do original (ex: erro médio quadrático abaixo de um threshold)
+                mse = self.loss(original, reconstructed).item()
+                threshold = 0.01  # Defina um threshold apropriado para seu caso
+                if mse < threshold:
+                    correct += 1
+                total += 1
+        accuracy = correct / total if total > 0 else 0.0
+        return accuracy
+    
     def save_model(self, path: str):
-        """Salva os pesos do modelo e hiperparâmetros essenciais."""
         checkpoint = {
             'state_dict': self.state_dict(),
             'model_args': {
@@ -262,10 +245,9 @@ class Dota2Autoencoder(nn.Module):
 
     @classmethod
     def load_model(cls, path: str, map_location=None, **override_args):
-        """Carrega o modelo salvo e retorna uma instância pronta para uso."""
         checkpoint = torch.load(path, map_location=map_location)
         model_args = checkpoint['model_args']
-        model_args.update(override_args)  # permite sobrescrever argumentos
+        model_args.update(override_args)
         model = cls(**model_args)
         model.load_state_dict(checkpoint['state_dict'])
         model.eval()
@@ -273,11 +255,9 @@ class Dota2Autoencoder(nn.Module):
         return model
 
     def save_loss_history(self, path: str):
-        """Salva o histórico de loss em um arquivo texto ou csv."""
-        import csv
         with open(path, 'w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['loss'])
-            for loss in self.loss_history:
-                writer.writerow([loss])
+            writer.writerow(['loss', 'eval_loss'])
+            for loss, eval in zip(self.avg_history, self.avg_eval_history):
+                writer.writerow([loss, eval])
         print(f"Histórico de loss salvo em {path}")
