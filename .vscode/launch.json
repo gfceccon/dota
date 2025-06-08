@@ -5,19 +5,19 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Force Learning",
+      "name": "Test Autoencoder",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--force"],
+      "args": ["--patches=[53]", "--mse_threshold=0.01"],
       "console": "integratedTerminal"
     },
     {
-      "name": "Load Learning",
+      "name": "Train Autoencoder",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": [],
+      "args": ["--patches=[53]", "--mse_threshold=0.01", "--train"],
       "console": "integratedTerminal"
     },
     {
