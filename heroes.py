@@ -47,7 +47,7 @@ def get_heroes(path: str):
             ).alias("roles_vector")
         )
         .select(
-            pl.col("id").alias("hero_id"),
+            pl.col("id").alias("hero_id").cast(pl.Int32),
             pl.col("localized_name").alias("hero_name"),
             pl.col("roles"),
             *fixed_hero_cols,

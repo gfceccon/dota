@@ -6,10 +6,10 @@ from players import get_players_draft
 
 
 def preprocess_dataset(path: str, patches: list[int], tier: list[str],
-                       min_duration: int = 10 * 60, max_duration: int = 120 * 60) -> tuple[pl.LazyFrame, list[str], list[str]]:
+                       min_duration: int = 10 * 60, max_duration: int = 120 * 60) -> tuple[pl.LazyFrame, list[str], list[str], list[str]]:
 
     # Carregando e filtrando partidas
-    matches = get_matches(path, patches, tier, min_duration, max_duration)
+    matches, match_cols = get_matches(path, patches, tier, min_duration, max_duration)
 
     # Carregando jogos e draft de jogadores
     games, players_cols, hero_cols = get_players_draft(path, matches)
@@ -34,18 +34,15 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
                 pl.when(pl.col("team").eq(team_id) &
                         pl.col("pick").eq(True))
                 .then(
-                    pl.concat_list(
-                        [
-                            (pl.col(f"{stat}") * 1.0 - pl.col(f"{stat}").min()) /
-                            pl.when(
-                                (pl.col(f"{stat}").max() - pl.col(f"{stat}").min()) != 0)
-                            .then(pl.col(f"{stat}").max() - pl.col(f"{stat}").min())
-                            .otherwise(1.0)
-                            for stat in players_cols]
-                    ))
-                .drop_nulls()
-                .drop_nans()
-                .alias(f"{team_name}_stats_normalized")
+                    (pl.col(f"{stat}") * 1.0 - pl.col(f"{stat}").min()) /
+                    pl.when(
+                        (pl.col(f"{stat}").max() - pl.col(f"{stat}").min()) != 0)
+                    .then(pl.col(f"{stat}").max() - pl.col(f"{stat}").min())
+                    .otherwise(1.0)
+                )
+                .fill_null(0)
+                .alias(f"{team_name}_{stat}")
+                for stat in players_cols
                 for team_id, team_name in [(0, "radiant"), (1, "dire")]
             ],
 
@@ -53,50 +50,46 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
                 pl.when(pl.col("team").eq(team_id) &
                         pl.col("pick").eq(True))
                 .then(
-                    pl.concat_list(
-                        [
-                            (pl.col(f"{stat}") * 1.0 - pl.col(f"{stat}").min()) /
-                            pl.when(
-                                (pl.col(f"{stat}").max() - pl.col(f"{stat}").min()) != 0)
-                            .then(pl.col(f"{stat}").max() - pl.col(f"{stat}").min())
-                            .otherwise(1.0)
-                            for stat in hero_cols]
-                    ))
-                .drop_nulls()
-                .drop_nans()
-                .alias(f"{team_name}_hero_stats_normalized")
+                    (pl.col(f"{stat}") * 1.0 - pl.col(f"{stat}").min()) /
+                    pl.when(
+                        (pl.col(f"{stat}").max() - pl.col(f"{stat}").min()) != 0)
+                    .then(pl.col(f"{stat}").max() - pl.col(f"{stat}").min())
+                    .otherwise(1.0)
+                )
+                .fill_null(0)
+                .alias(f"{team_name}_hero_{stat}")
+                for stat in hero_cols
                 for team_id, team_name in [(0, "radiant"), (1, "dire")]
             ],
-
+            
+            *[pl.col(c).drop_nulls().first().alias(f"match_{c}") for c in match_cols],
         )
         .filter(
             (~pl.col("radiant_stats_null").list.any()) &
             (~pl.col("dire_stats_null").list.any()) &
 
-            (pl.col("dire_hero_stats_normalized").list.len() == 5) &
-            (pl.col("radiant_hero_stats_normalized").list.len() == 5) &
-
-
             (pl.col("radiant_picks").list.len() == 5) &
             (pl.col("dire_picks").list.len() == 5) &
 
             (pl.col("radiant_bans").list.len() == 7) &
-            (pl.col("dire_bans").list.len() == 7)
+            (pl.col("dire_bans").list.len() == 7) &
+            
+            (pl.col("match_radiant_win").is_in([True, False]))
         )
     )
 
-    return dataset, players_cols, hero_cols
+    return dataset, players_cols, match_cols, hero_cols
 
 
 def get_dataset(
-        path: str, year: int = 2024,
+        path: str,
         tier: list[str] = ['professional'],
         duration: tuple[int, int] = (30, 120),
         specific_patches: list[int] = []
-) -> tuple[pl.DataFrame, list[str], list[str]]:
+) -> tuple[pl.DataFrame, list[str], list[str], list[str]]:
     print(f"Carregando dataset...")
     print(f"Tier: {tier}, Duração: {duration[0]}-{duration[1]} minutos")
-    patches = get_patches(path, year)
+    patches = get_patches(path)
     print("Patches:")
     if specific_patches:
         for patch_id in specific_patches:
@@ -106,7 +99,7 @@ def get_dataset(
         for patch, (count, name) in patches.items():
             print(f"Patch {name} ({patch}): {count} partidas")
 
-    dataset, games_cols, hero_cols = preprocess_dataset(
+    dataset, player_cols, match_cols, hero_cols = preprocess_dataset(
         path,
         list(patches.keys()) if not specific_patches else specific_patches,
         tier,
@@ -116,18 +109,52 @@ def get_dataset(
 
     dataset = (
         dataset
+        .with_columns(
+            *[pl.col(f"{team_name}_{stat}").list.get(i).alias(f"{team_name}_{stat}_{i}")
+                for stat in player_cols
+                for team_name in ["radiant", "dire"]
+                for i in range(5)
+              ],
+            *[pl.col(f"{team_name}_hero_{stat}").list.get(i).alias(f"{team_name}_hero_{stat}_{i}")
+                for stat in hero_cols
+                for team_name in ["radiant", "dire"]
+                for i in range(5)
+              ],
+        )
+        .with_columns(
+            *[pl.concat_list([pl.col(f"{team_name}_{stat}_{i}")
+                        for stat in player_cols
+                         for i in range(5)
+                         ]).alias(f"{team_name}_features",)
+                for team_name in ["radiant", "dire"]],
+
+
+            *[pl.concat_list([pl.col(f"{team_name}_hero_{stat}_{i}")
+                        for stat in hero_cols
+                         for i in range(5)
+                         ]).alias(f"{team_name}_hero_features",)
+                for team_name in ["radiant", "dire"]],
+        )
+        .with_columns(
+            pl.when(pl.col("match_radiant_win") == True)
+            .then(pl.lit(0))
+            .otherwise(pl.lit(1))
+            .alias("match_winner")
+        )
         .select(
             "match_id",
             "radiant_hero_roles", "dire_hero_roles",
             "radiant_picks", "dire_picks",
             "radiant_bans", "dire_bans",
-            "radiant_stats_normalized", "dire_stats_normalized",
-            "radiant_hero_stats_normalized", "dire_hero_stats_normalized"
+            "radiant_features", "dire_features",
+            "radiant_hero_features", "dire_hero_features",
+            "order", "match_winner",
+            *[f"match_{c}" for c in match_cols]
         )
         .collect()
     )
     print("Dataset carregado e pré-processado com sucesso!")
-    return dataset, games_cols, hero_cols
+    return dataset, player_cols, match_cols, hero_cols
 
 
 def save_dataset(dataset: pl.DataFrame, output_path: str = "./tmp/DATASET.json") -> None:
@@ -140,7 +167,7 @@ if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
     path = kagglehub.dataset_download(dataset_name)
 
-    matches = get_matches(path, patches=[54], tier=[
+    matches, _ = get_matches(path, patches=[54], tier=[
                           'professional'], min_duration=30 * 60, max_duration=120 * 60)
     games, players_cols, hero_cols = get_players_draft(path, matches)
 

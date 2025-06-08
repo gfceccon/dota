@@ -17,10 +17,21 @@ class Dota2Files(Enum):
     PATCHES_NOTES = f"Constants/Constants.PatchNotes.csv"
 
 # Retorna o LazyFrame para o arquivo especificado
-def get_lf(file:Dota2Files, path: str , year: int = 2024) -> pl.LazyFrame:
+def get_lf(file:Dota2Files, path: str , years: tuple[int, int] = (2020, 2024)) -> pl.LazyFrame:
     if(file == Dota2Files.LEAGUES or
        file == Dota2Files.HEROES or
        file == Dota2Files.PATCHES or
        file == Dota2Files.PATCHES_NOTES):
         return pl.scan_csv(f"{path}/{file.value}")
-    return pl.scan_csv(f"{path}/{year}/{file.value}")
+    scans: list[pl.LazyFrame]= []
+    schemas: list[pl.Schema] = []
+    for year in range(years[0], years[1]):
+        df = pl.scan_csv(f"{path}/{year}/{file.value}")
+        scans.append(df)
+        schemas.append(df.collect_schema())
+    names = set(schemas[0].names())
+    for schema in schemas:
+        names.intersection_update(schema.names())
+    lf = pl.concat(scans, how="diagonal_relaxed").lazy()
+    return lf
+    

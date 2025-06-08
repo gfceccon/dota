@@ -2,7 +2,6 @@ import polars as pl
 from files import (
     Dota2Files,
     get_lf,
-    objectives_file,
 )
 
 def get_objectives(path: str) -> pl.LazyFrame:

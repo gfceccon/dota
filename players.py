@@ -36,20 +36,20 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
 
     players = (
         get_lf(Dota2Files.PLAYERS, path)
-        .select([pl.col(col).alias(f"player_{col}") for col in _players_cols] + ["match_id"])
-        .with_columns(pl.col("player_hero_id").alias("hero_id"))
+        .select([pl.col(col).alias(f"player_{col}") for col in _players_cols] + [pl.col("match_id")])
+        .with_columns(pl.col("player_hero_id").alias("hero_id").cast(pl.Int32))
     )
 
     picks = (
         get_lf(Dota2Files.PICKS_BANS, path)
         .drop_nulls(subset="team")
-        .select([pl.col(col).alias(f"pick_{col}") for col in _picks_cols] + ["match_id"])
+        .select([pl.col(col).alias(f"pick_{col}") for col in _picks_cols] + [pl.col("match_id")])
     )
     heroes, hero_cols, _, _ = get_heroes(path)
     games = (
         matches
         .join(picks, on="match_id", how="inner")
-        .with_columns(pl.col("pick_hero_id").alias("hero_id"))
+        .with_columns(pl.col("pick_hero_id").alias("hero_id").cast(pl.Int32))
         .join(players, left_on=["match_id", "hero_id"], right_on=["match_id", "hero_id"], how="left")
         .join(heroes, on="hero_id", how="inner")
         .with_columns([
@@ -82,16 +82,6 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
             
             *[pl.col(col).cast(pl.Float64, strict=False).fill_null(strategy="zero").alias(col) for col in players_cols],
         ])
-        .select([
-            "match_id",
-            "radiant_hero_roles",
-            "dire_hero_roles",
-            "radiant_stats_null",
-            "dire_stats_null",
-            *picks_cols,
-            *hero_cols,
-            *players_cols,
-        ])
     )
 
     return games, players_cols, hero_cols
@@ -100,7 +90,7 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
 if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
     path = kagglehub.dataset_download(dataset_name)
-    matches = get_lf(Dota2Files.METADATA, path).select(["match_id"])
+    matches = get_lf(Dota2Files.METADATA, path).select([pl.col("match_id")])
     players, player_cols, hero_cols = get_players_draft(path, matches)
 
     print(f"Players DataFrame: {players.collect().head()}")
