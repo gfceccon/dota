@@ -1,3 +1,4 @@
+import ast
 import os
 import sys
 import kagglehub
@@ -14,10 +15,10 @@ patches_str = [str(patch) for patch in patches]
 dataset_path = f"./tmp/DATASET_{"_".join(patches_str)}.json"
 dataset_full_path = f"./tmp/DATASET_FULL_{"_".join(patches_str)}.json"
 dataset_metadata_path = f"./tmp/DATASET_METADATA_{"_".join(patches_str)}.json"
-save_model_path = f"./tmp/dota2_autoencoder_{"_".join(patches_str)}.h5"
-save_loss_history_path = f"./tmp/dota2_autoencoder_loss_history_{"_".join(patches_str)}.csv"
-csv_path = f"./tmp/dota2_autoencoder_loss_history_{"_".join(patches_str)}.csv"
-save_path = f"./tmp/dota2_autoencoder_loss_plot_{"_".join(patches_str)}.png"
+save_filename = f"dota2_autoencoder_{"_".join(patches_str)}"
+save_model_path = f"./tmp/{save_filename}_model.h5"
+save_loss_history_path = f"./tmp/{save_filename}_history.csv"
+save_plot_loss_history_path = f"./tmp/{save_filename}_history.png"
 df_scale = 1
 
 
@@ -54,7 +55,7 @@ def train_autoencoder(train_data, validation_data, test_data, dict_roles,
     print("="*50)
     print("Treinando Dota2 Autoencoder...")
     autoencoder.train_data(
-        training_df=train_data, validation_df=validation_data, epochs=100, best_model_path=save_model_path, verbose=False)
+        training_df=train_data, validation_df=validation_data, epochs=100, best_model_filename=save_filename, verbose=False)
     autoencoder.save_loss_history(save_loss_history_path)
     print(
         f"Modelo salvo em {save_model_path} e histórico de perda salvo em {save_loss_history_path}.")
@@ -64,7 +65,7 @@ def train_autoencoder(train_data, validation_data, test_data, dict_roles,
 
 def main():
     if (os.path.exists(dataset_full_path) and
-            os.path.exists(dataset_metadata_path)):
+            os.path.exists(dataset_metadata_path) and "--save" not in sys.argv):
         print("Carregando modelo e metadados do dataset...")
 
         dataset = pl.read_json(dataset_full_path)
@@ -77,7 +78,7 @@ def main():
         match_cols = dataset_metadata["match_cols"].item()
         hero_cols = dataset_metadata["hero_cols"].item()
         dict_roles = dataset_metadata["dict_roles"].item()
-        patches_info = dataset_metadata["patches_info"].item()
+        patches_info = ast.literal_eval(dataset_metadata["patches_info"].item())
         print("Dataset já carregado do arquivo.")
     else:
         dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
@@ -93,7 +94,7 @@ def main():
             fraction=0.15 * df_scale, seed=42, shuffle=True)
 
         heroes, _, _, dict_roles = get_heroes(path)
-        n_heroes = heroes.select("hero_id").max().collect().item()
+        n_heroes = heroes.select("hero_idx").count().collect().item()
         n_hero_stats = len(dict_roles) + len(hero_cols)
         n_player_stats = len(player_cols)
 
@@ -109,7 +110,7 @@ def main():
                 "match_cols": [match_cols],
                 "hero_cols": [hero_cols],
                 "dict_roles": [dict_roles],
-                "patches_info": [patches_info]
+                "patches_info": [str(patches_info)]
             })
             dataset_metadata.write_json(dataset_metadata_path)
             print(f"Dataset completo salvo em {dataset_full_path}.")
@@ -171,7 +172,7 @@ def save_report(
         "[ARQUIVOS GERADOS]",
         f"- Modelo salvo: {save_model_path}",
         f"- Histórico de perda: {save_loss_history_path}",
-        f"- Plot de perda: {save_path}",
+        f"- Plot de perda: {save_plot_loss_history_path}",
         "",
         "[ESTRUTURA DOS DADOS]",
         f"- Colunas de heróis: {', '.join(autoencoder.hero_columns)}",
@@ -217,8 +218,8 @@ def save_report(
         f.write("\r\n".join(lines))
 
     print(f"Relatório salvo em {report_path}.")
-    print(f"Plotando histórico de perda em {save_path}...")
-    plot_loss_history(csv_path, save_path,
+    print(f"Plotando histórico de perda em {save_plot_loss_history_path}...")
+    plot_loss_history(save_loss_history_path, save_plot_loss_history_path,
                       title="Dota 2 Autoencoder Loss History")
 
 

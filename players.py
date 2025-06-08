@@ -23,14 +23,12 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
         "purchase_gem", "purchase_rapier",
     ]
 
-    _picks_cols = [
+    picks_cols = [
         "is_pick",
         "team",
         "hero_id",
         "order",
     ]
-    
-    picks_cols = ["pick", "team", "hero_id", "hero_name", "order"]
     
     players_cols = [f"player_{col}" for col in _players_cols]
 
@@ -43,7 +41,7 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
     picks = (
         get_lf(Dota2Files.PICKS_BANS, path)
         .drop_nulls(subset="team")
-        .select([pl.col(col).alias(f"pick_{col}") for col in _picks_cols] + [pl.col("match_id")])
+        .select([pl.col(col).alias(f"pick_{col}") for col in picks_cols] + [pl.col("match_id")])
     )
     heroes, hero_cols, _, _ = get_heroes(path)
     games = (

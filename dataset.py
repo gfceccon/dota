@@ -29,6 +29,16 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
                 pl.col("hero_id") + 1).drop_nulls().alias("radiant_bans"),
             pl.when(pl.col("team").eq(1) & pl.col("pick").eq(False)).then(
                 pl.col("hero_id") + 1).drop_nulls().alias("dire_bans"),
+            
+            pl.when(pl.col("team").eq(0) & pl.col("pick").eq(True)).then(
+                pl.col("hero_idx") + 1).drop_nulls().alias("radiant_picks_idx"),
+            pl.when(pl.col("team").eq(1) & pl.col("pick").eq(True)).then(
+                pl.col("hero_idx") + 1).drop_nulls().alias("dire_picks_idx"),
+
+            pl.when(pl.col("team").eq(0) & pl.col("pick").eq(False)).then(
+                pl.col("hero_idx") + 1).drop_nulls().alias("radiant_bans_idx"),
+            pl.when(pl.col("team").eq(1) & pl.col("pick").eq(False)).then(
+                pl.col("hero_idx") + 1).drop_nulls().alias("dire_bans_idx"),
 
             *[
                 pl.when(pl.col("team").eq(team_id) &
@@ -144,10 +154,16 @@ def get_dataset(
         .select(
             "match_id",
             "radiant_hero_roles", "dire_hero_roles",
+            
             "radiant_picks", "dire_picks",
             "radiant_bans", "dire_bans",
+            
+            "radiant_picks_idx", "dire_picks_idx",
+            "radiant_bans_idx", "dire_bans_idx",
+            
             "radiant_features", "dire_features",
             "radiant_hero_features", "dire_hero_features",
+            
             "order", "match_winner",
             *[f"match_{c}" for c in match_cols]
         )

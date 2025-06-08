@@ -1,8 +1,7 @@
-
-import kagglehub
-from files import Dota2Files, get_lf
 import ast
+import kagglehub
 import polars as pl
+from files import Dota2Files, get_lf
 
 
 def get_heroes(path: str):
@@ -24,6 +23,9 @@ def get_heroes(path: str):
     dict_roles = {role: i for i, role in enumerate(roles)}
     roles_idx = [i for i in dict_roles.values()]
 
+    hero_ids = heroes.select(pl.col("id")).unique().sort("id").collect().to_series().to_list()
+    dict_hero_index = {hid: i for i, hid in enumerate(hero_ids)}
+
     return (
         heroes
         .with_columns(
@@ -38,7 +40,9 @@ def get_heroes(path: str):
                 lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else None, return_dtype=pl.UInt8
             ).alias("attack_type"),
             
+            
             *[pl.col(col).cast(pl.Float64, strict=False).fill_null(strategy="zero").alias(col) for col in hero_cols],
+            pl.col("id").map_elements(lambda x: dict_hero_index.get(x), return_dtype=pl.UInt32).alias("hero_idx"),
         )
         .with_columns(
             pl.col("roles").map_elements(
@@ -50,6 +54,7 @@ def get_heroes(path: str):
             pl.col("id").alias("hero_id").cast(pl.Int32),
             pl.col("localized_name").alias("hero_name"),
             pl.col("roles"),
+            pl.col("hero_idx"),  # Seleciona a nova coluna
             *fixed_hero_cols,
             *hero_cols
         )

@@ -109,10 +109,10 @@ class Dota2Autoencoder(nn.Module):
 
     def flatten(self, data: np.ndarray[Any, Any], batch_size: int, columns: list[str]) -> torch.Tensor:
         try:
-            idx_radiant_picks = columns.index('radiant_picks')
-            idx_dire_picks = columns.index('dire_picks')
-            idx_radiant_bans = columns.index('radiant_bans')
-            idx_dire_bans = columns.index('dire_bans')
+            idx_radiant_picks = columns.index('radiant_picks_idx')
+            idx_dire_picks = columns.index('dire_picks_idx')
+            idx_radiant_bans = columns.index('radiant_bans_idx')
+            idx_dire_bans = columns.index('dire_bans_idx')
             idx_radiant_hero_roles = columns.index('radiant_hero_roles')
             idx_dire_hero_roles = columns.index('dire_hero_roles')
             idx_radiant_features = columns.index('radiant_features')
@@ -210,12 +210,13 @@ class Dota2Autoencoder(nn.Module):
                    training_df: pl.DataFrame, validation_df: pl.DataFrame,
                    epochs: int = 10, batch_size=32, early_stopping: bool = True,
                    patience: int = 10, min_delta: float = 1e-4,
-                   best_model_path: str = "best_model.pth",
+                   best_model_filename: str = "best_model.h5",
                    verbose=False,) -> None:
         best_val_loss = float('inf')
         epochs_no_improve = 0
         best_state = None
-        epoch_stop = epochs
+        self.epoch_stop = epochs
+        best_model_filename = f"./best/{best_model_filename}.h5"
         for epoch in range(epochs):
             total_loss = 0.0
             total_val_loss = 0.0
@@ -268,17 +269,17 @@ class Dota2Autoencoder(nn.Module):
                     epochs_no_improve = 0
                     best_state = self.state_dict()
                     # Salva o melhor modelo
-                    self.save_model(best_model_path)
+                    self.save_model(best_model_filename)
                     if verbose:
                         print(
-                            f"Melhor modelo salvo em {best_model_path} (Val Loss: {best_val_loss:.4f})")
+                            f"Melhor modelo salvo em {best_model_filename} (Val Loss: {best_val_loss:.4f})")
                 else:
                     epochs_no_improve += 1
                     if verbose:
                         print(
                             f"Nenhuma melhora na validação por {epochs_no_improve} épocas.")
                 if epochs_no_improve >= patience:
-                    epoch_stop = epoch + 1
+                    self.epoch_stop = epoch + 1
                     print(f"Early stopping ativado após {epoch+1} épocas.")
                     print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                     break
@@ -293,9 +294,8 @@ class Dota2Autoencoder(nn.Module):
                     f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
         # Carrega o melhor modelo ao final do treinamento
         if early_stopping and best_state is not None:
-            self.load_state_dict(torch.load(best_model_path)['state_dict'])
-            
-        self.epoch_stop = epoch_stop
+            with torch.serialization.safe_globals([pl.series.series.Series]):
+                self.load_state_dict(torch.load(best_model_filename)['state_dict'])
 
     def test_model(self, test_df: pl.DataFrame, batch_size: int = 32, threshold=0.01) -> tuple[float, float, float, float]:
         self.eval()
@@ -350,14 +350,15 @@ class Dota2Autoencoder(nn.Module):
 
     @classmethod
     def load_model(cls, path: str, map_location: torch.device, **override_args):
-        checkpoint = torch.load(path, map_location=map_location)
-        model_args = checkpoint['model_args']
-        model_args.update(override_args)
-        model = cls(**model_args)
-        model.load_state_dict(checkpoint['state_dict'])
-        model.eval()
-        print(f"Modelo carregado de {path}")
-        return model
+        with torch.serialization.safe_globals([pl.series.series.Series]):
+            checkpoint = torch.load(path, map_location=map_location)
+            model_args = checkpoint['model_args']
+            model_args.update(override_args)
+            model = cls(**model_args)
+            model.load_state_dict(checkpoint['state_dict'])
+            model.eval()
+            print(f"Modelo carregado de {path}")
+            return model
 
     def save_loss_history(self, path: str):
         with open(path, 'w', newline='') as f:
