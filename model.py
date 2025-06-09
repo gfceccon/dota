@@ -214,7 +214,7 @@ class Dota2Autoencoder(nn.Module):
         reconstructed = self.decoder(latent)
         return latent, reconstructed
 
-    def encode(self, data: dict[str, Any], batch_size: int, columns: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
+    def encode(self, data: np.ndarray[Any, Any], batch_size: int, columns: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
         _data = np.array(data)
         tensor = self.flatten(_data, batch_size, columns)
         latent, reconstructed = self.forward(tensor)
@@ -253,7 +253,6 @@ class Dota2Autoencoder(nn.Module):
 
             self.train()
             # Treinamento do modelo
-            training_df.columns
             for batch in training_df.iter_slices(batch_size):
                 batch_np = batch.to_numpy()
                 data = self.flatten(batch_np, min(
@@ -380,8 +379,8 @@ class Dota2Autoencoder(nn.Module):
             },
             'state_dict': self.state_dict(),
             'loss_history': self.loss_history,
-            'avg_history': self.avg_history,
-            'avg_eval_history': self.avg_val_history,
+            'best_loss': self.best_loss,
+            'best_val_loss': self.best_val_loss,
             'epoch_stop': self.epoch_stop
         }
         torch.save(checkpoint, path)
@@ -389,9 +388,10 @@ class Dota2Autoencoder(nn.Module):
             self._log(f"Modelo salvo em {path}")
 
     @classmethod
-    def load_model(cls, path: str, map_location: torch.device, silent: bool = False, **override_args):
+    def load_model(cls, path: str, silent: bool = False, **override_args):
+        location = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         with torch.serialization.safe_globals([pl.series.series.Series]):
-            checkpoint = torch.load(path, map_location=map_location)
+            checkpoint = torch.load(path, map_location=location)
             model_args = checkpoint['model_args']
             model_args.update(override_args)
             model = cls(**model_args, silent=silent)
