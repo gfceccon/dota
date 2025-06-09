@@ -2,24 +2,29 @@
 ## Dataset
 [Dota 2 Pro League Matches](https://www.kaggle.com/datasets/bwandowando/dota-2-pro-league-matches-2023)
 
-## Clustering
-* [] Pre-processing
-  * [x] Patch
+## Dataset
+* [x] Pré-processamento
+  * [x] Normalização
+  * [x] Patch (2020-2024)
   * [x] League (Professional)
   * [x] Heroes (Vector)
-    * [] Attributes (Vector)
-  * [] Duration (10 < Time < 120)
+    * [x] Attributes (Vector)
+  * [x] Duration (10 < Time < 120)
   * [x] Picks and Bans (Vector)
+  * [x] Sentries and Observers (Feature)
+  * [x] GPM and XPM (Feature)
   * [] Gold per Minute (Temporal)
   * [] Exp per Minute (Temporal)
-  * [x] Sentries and Observers (Feature)
-  * [] Itens (?)
-* [] K-Means / K-Shape
-* [] DBSCAN / HDBSCAN
 
-## Auto-encoders
-* [] Normalização
-* [] Feature Extraction (Temporal)
-* [] Mask
-  * [] Padding (Temporal)
-  * 
+## Autoencoders
+* [x] Model
+* [x] Embedding
+* [x] Training
+* [x] Tests
+
+## Clustering
+* [] K-Means
+* [] DBSCAN
+* [] HDBSCAN
+* [] Visualization
+* [] Tests
