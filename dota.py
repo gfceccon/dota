@@ -379,8 +379,4 @@ class Dota2:
                 [input_dim] + self.configuration['hidden_layers'] +
                 [self.configuration['latent_dim']] +
                 list(reversed(self.configuration['hidden_layers'])) + [input_dim])
-<<<<<<< HEAD
             })")
-=======
-            }")
->>>>>>> f7a82ac474b3d6c93fcc3aff74626223713daff3
