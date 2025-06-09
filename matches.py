@@ -18,7 +18,7 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
     )
     match_cols = [
         "duration_normalized",
-        "radiant_win"
+        "winner"
     ]
     matches = (
         get_lf(Dota2Files.METADATA, path, (2020, 2025))
@@ -26,13 +26,16 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
         .filter(
             pl.col("patch").is_in(patches),
             pl.col("duration").is_between(min_duration, max_duration),
+            pl.col("radiant_win").is_not_null(),
         )
         .with_columns(
-            (pl.col("duration") / max_duration).alias("duration_normalized"),
+            (pl.col("duration") / max_duration).alias("duration_normalized").cast(pl.Float32),
+            pl.col("radiant_win").cast(pl.Int32).alias("winner"),
+            pl.col("leagueid").alias("league_id"),
         )
         .select([
             "match_id",
-            pl.col("leagueid").alias("league_id"),
+            "league_id",
             *match_cols,
         ])
         .join(other=leagues, on="league_id", how="left")

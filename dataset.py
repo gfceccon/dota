@@ -84,7 +84,7 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
             (pl.col("radiant_bans").list.len() == 7) &
             (pl.col("dire_bans").list.len() == 7) &
             
-            (pl.col("match_radiant_win").is_in([True, False]))
+            (pl.col("match_winner").is_not_null())
         )
     )
 
@@ -145,12 +145,6 @@ def get_dataset(
                          ]).alias(f"{team_name}_hero_features",)
                 for team_name in ["radiant", "dire"]],
         )
-        .with_columns(
-            pl.when(pl.col("match_radiant_win") == True)
-            .then(pl.lit(0))
-            .otherwise(pl.lit(1))
-            .alias("match_winner")
-        )
         .select(
             "match_id",
             "radiant_hero_roles", "dire_hero_roles",
@@ -164,12 +158,10 @@ def get_dataset(
             "radiant_features", "dire_features",
             "radiant_hero_features", "dire_hero_features",
             
-            "order", "match_winner",
             *[f"match_{c}" for c in match_cols]
         )
         .collect()
     )
-    print("Dataset carregado e pré-processado com sucesso!")
     return dataset, player_cols, match_cols, hero_cols
 
 
