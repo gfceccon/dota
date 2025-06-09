@@ -57,8 +57,6 @@ class Dota2:
             "verbose": False
         }
 
-        self.autoencoder = self.create_autoencoder()
-
         _, self.player_cols, self.match_cols, self.hero_cols = get_dataset(
             path, tier, duration, patches)
 
@@ -68,6 +66,8 @@ class Dota2:
         self.n_hero_stats = len(self.dict_roles) + len(self.hero_cols)
         self.n_player_stats = len(self.player_cols)
         self.patches_info = get_patches(path)
+
+        self.autoencoder = self.create_autoencoder()
 
     def _log(self, *args, **kwargs):
         log_message = ' '.join(str(arg) for arg in args)
@@ -223,9 +223,9 @@ class Dota2:
             fraction=0.15 * df_scale, shuffle=True)
         return train_data, validation_data, test_data
 
-    def train_or_load_autoencoder(self, dataset: pl.DataFrame,
+    def train_or_load_autoencoder(self, train_df: pl.DataFrame, val_df: pl.DataFrame, test_df: pl.DataFrame,
                                   save_model_path: str, save_loss_history_path: str,
-                                  epochs=100, train=False, silent: bool = False):
+                                  epochs=100, train=False, silent: bool = False) -> tuple[Dota2Autoencoder, float]:
         self.silent = silent
         self._log("="*50)
         self._log(
@@ -243,22 +243,16 @@ class Dota2:
 
         if (os.path.exists(save_model_path) and train is False):
             self._log("Carregando modelo treinado...")
-            device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu")
-            return Dota2Autoencoder.load_model(save_model_path, device)
+            autoencoder =  Dota2Autoencoder.load_model(save_model_path)
+            return autoencoder, autoencoder.best_loss
         else:
             self._log("Treinando novo modelo de autoencoder...")
-            train_data, validation_data, test_data = self.prepare_data_splits(
-                dataset, 1.0)
-            self.autoencoder.train_data(training_df=train_data, validation_df=validation_data,
+            self.autoencoder.train_data(training_df=train_df, validation_df=val_df,
                                         epochs=epochs, verbose=self.configuration["verbose"], silent=self.silent)
             self.autoencoder.save_loss_history(
                 save_loss_history_path, silent=self.silent)
-            self.save_report(train_data, validation_data, test_data,
-                             self.patches, self.mse_threshold,
-                             self.report_path, self.loss_history_path,
-                             self.plot_path, silent=self.silent)
-            return self.autoencoder
+            self.autoencoder.save_model(save_model_path, silent=self.silent)
+            return self.autoencoder, self.autoencoder.best_loss
 
     def get_filenames(self, patches: list[int], silent: bool = False) -> dict[str, str]:
         self.silent = silent
