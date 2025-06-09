@@ -88,7 +88,7 @@ class Dota2Autoencoder(nn.Module):
         self.loss = nn.MSELoss()
 
         # Históricos de loss
-        self.epoch_stop = 0
+        self.train_stopped = 0
         self.loss_history = []
         self.val_loss_history = []
         self.full_loss_history = []
@@ -236,11 +236,9 @@ class Dota2Autoencoder(nn.Module):
         self.verbose = verbose
         if best_model_filename is None:
             best_model_filename = f"./best/{self.base_filename}.h5"
-        else:
-            best_model_filename = f"./best/{best_model_filename}.h5"
         epochs_no_improve = 0
         best_state = None
-        self.epoch_stop = epochs
+        self.train_stopped = epochs
         self.best_val_loss = float('inf')
         self._log(f"Iniciando treinamento do modelo com {epochs} épocas")
         for epoch in range(epochs):
@@ -305,7 +303,7 @@ class Dota2Autoencoder(nn.Module):
                         self._log(
                             f"Nenhuma melhora na validação por {epochs_no_improve} épocas.")
                 if epochs_no_improve >= patience:
-                    self.epoch_stop = epoch + 1
+                    self.train_stopped = epoch + 1
                     self._log(f"Early stopping ativado após {epoch+1} épocas.")
                     self._log(
                         f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
@@ -372,7 +370,7 @@ class Dota2Autoencoder(nn.Module):
             'state_dict': self.state_dict(),
             'full_loss_history': self.full_loss_history,
             'best_val_loss': self.best_val_loss,
-            'epoch_stop': self.epoch_stop
+            'train_stopped': self.train_stopped
         }
         torch.save(checkpoint, path)
         if (self.verbose and not self.silent):

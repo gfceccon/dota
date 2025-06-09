@@ -47,8 +47,8 @@ class Dota2:
         self.path = path
         self.should_train = True
         self.configuration = {
-            "hero_pick_embedding_dim": 8,
-            "hero_role_embedding_dim": 4,
+            "hero_pick_embedding_dim": 16,
+            "hero_role_embedding_dim": 8,
             "latent_dim": 2,
             "hidden_layers": [128, 32],
             "dropout": 0.3,
@@ -93,7 +93,7 @@ class Dota2:
             learning_rate=self.configuration["learning_rate"],
             verbose=self.configuration["verbose"],
             log_filename=self.log_filename,
-        ).to(self.autoencoder.device)
+        )
         return self.autoencoder
 
     def set_config(self, config: dict, silent: bool = False):
@@ -295,7 +295,7 @@ class Dota2:
         ]
         lines.append("")
         lines.append("[INFORMAÇÕES DO TREINAMENTO]")
-        lines.append(f"- Épocas: {self.autoencoder.epoch_stop}")
+        lines.append(f"- Épocas: {self.autoencoder.train_stopped}")
         lines.append(
             f"- Perda de treino final: {self.autoencoder.loss_history[-1]:.6f}")
         lines.append(

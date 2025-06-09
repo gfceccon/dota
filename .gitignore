@@ -176,3 +176,6 @@ cython_debug/
 /tmp/
 processed_dataset.json
 /best/
+/report/
+/plot/
+/loss/
