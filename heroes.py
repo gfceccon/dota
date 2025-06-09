@@ -30,24 +30,24 @@ def get_heroes(path: str):
         heroes
         .with_columns(
             pl.col("primary_attr").map_elements(lambda x: dict_attributes.get(x) if isinstance(
-                x, str) else x, return_dtype=pl.UInt32).alias("primary_attribute"),
+                x, str) else x, return_dtype=pl.Int32).alias("primary_attribute"),
             pl.col("roles").map_elements(
                 lambda x: [dict_roles.get(y) for y in ast.literal_eval(
                     x)] if isinstance(x, str) else x,
-                return_dtype=pl.List(pl.UInt32)
+                return_dtype=pl.List(pl.Int32)
             ),
             pl.col("attack_type").map_elements(
                 lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else None, return_dtype=pl.UInt8
             ).alias("attack_type"),
             
             
-            *[pl.col(col).cast(pl.Float64, strict=False).fill_null(strategy="zero").alias(col) for col in hero_cols],
-            pl.col("id").map_elements(lambda x: dict_hero_index.get(x), return_dtype=pl.UInt32).alias("hero_idx"),
+            *[pl.col(col).cast(pl.Float32, strict=False).fill_null(strategy="zero").alias(col) for col in hero_cols],
+            pl.col("id").map_elements(lambda x: dict_hero_index.get(x), return_dtype=pl.Int32).alias("hero_idx"),
         )
         .with_columns(
             pl.col("roles").map_elements(
                 lambda x: [1 if i in x else 0 for i in roles_idx],
-                return_dtype=pl.List(pl.UInt32)
+                return_dtype=pl.List(pl.Int32)
             ).alias("roles_vector")
         )
         .select(

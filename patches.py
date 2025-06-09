@@ -14,16 +14,16 @@ def get_patches(path: str) -> dict[int, tuple[int, str]]:
         meta.select("match_id", "patch")
         .group_by("patch")
         .agg(pl.count("match_id").alias("count"))
-        .select("patch", "count").collect()
+        .select("patch", "count",).collect()
     )
     
     for row in patch_meta.iter_rows(named=True):
         patch = row["patch"]
         count = row["count"]
-        patch_name = patches_detail.item(row["patch"], 0)
+        patch_name = patches_detail.item(patch - 1, 0)
         patch_count[patch] = (count, patch_name)
-        
-    return patch_count
+    patches = dict(sorted(patch_count.items()))
+    return patches
 
 
 if __name__ == "__main__":

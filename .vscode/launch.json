@@ -9,7 +9,7 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--patches=[53]", "--mse_threshold=0.01"],
+      "args": ["--patches=[56,55]", "--mse_threshold=0.01"],
       "console": "integratedTerminal"
     },
     {
@@ -17,7 +17,7 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--patches=[53]", "--mse_threshold=0.01", "--train"],
+      "args": ["--patches=[56,55]", "--mse_threshold=0.01", "--train"],
       "console": "integratedTerminal"
     },
     {
