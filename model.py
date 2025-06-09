@@ -1,11 +1,12 @@
 import math
-from typing import Any
+from typing import Any, Optional
 import numpy as np
 import torch.nn as nn
 import polars as pl
 import time
 import torch
 import csv
+from datetime import datetime
 
 
 class Dota2Autoencoder(nn.Module):
@@ -18,15 +19,28 @@ class Dota2Autoencoder(nn.Module):
         player_cols: list[str],
         match_cols: list[str],
         n_heroes: int,
-        n_players: int = 10,
-        n_bans: int = 14,
-        latent_dim: int = 32,
-        hidden_layers: list[int] = [128, 64],
-        dropout: float = 0.2,
+        n_players: int = 5,
+        n_bans: int = 7,
+        latent_dim: int = 2,
+        hidden_layers: list[int] = [128, 32],
+        dropout: float = 0.3,
         learning_rate: float = 0.001,
-        verbose: bool = False
+        verbose: bool = False,
+        silent: bool = False,
+        name: str = "autoencoder",
+        log_filename: str | None = None,
     ):
         super(Dota2Autoencoder, self).__init__()
+        self.silent = silent
+        self.verbose = verbose
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.name = name
+        self.base_filename = f"{self.name}_{timestamp}"
+        self.log_filename = f"log_{self.base_filename}.txt"
+        if log_filename is not None:
+            self.log_filename = log_filename
+
         # Configura o device para GPU se disponível, caso contrário CPU
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
@@ -58,15 +72,13 @@ class Dota2Autoencoder(nn.Module):
         self.hidden_layers = hidden_layers
         self.learning_rate = learning_rate
         self.dropout = dropout
-
         # Dimensões de embedding para picks e roles
         self.hero_pick_embedding_dim = hero_pick_embedding_dim
         self.hero_role_embedding_dim = hero_role_embedding_dim
-
         # Calcula a dimensão de entrada do modelo, para cada time
         self.input_dim = self.compute_input_dim()
-        if (verbose):
-            print(f"Input dimension: {self.input_dim}")
+        if (self.verbose and not self.silent):
+            self._log(f"Input dimension: {self.input_dim}")
 
         # Inicializa as camadas do modelo
         self.encoder = self.create_encoder(verbose=verbose)
@@ -80,6 +92,8 @@ class Dota2Autoencoder(nn.Module):
         self.avg_history = []
         self.avg_val_history = []
         self.epoch_stop = 0
+        self.best_loss = float('inf')
+        self.best_val_loss = float('inf')
 
     def compute_input_dim(self):
         picks_dim = 2 * self.n_players * self.hero_pick_embedding_dim
@@ -206,17 +220,32 @@ class Dota2Autoencoder(nn.Module):
         latent, reconstructed = self.forward(tensor)
         return latent, reconstructed
 
+    def _log(self, *args, **kwargs):
+        log_message = ' '.join(str(arg) for arg in args)
+        with open(f"./tmp/{self.log_filename}", "a", encoding="utf-8") as log_file:
+            log_file.write(log_message + "\n")
+        if not getattr(self, "silent", False):
+            print(*args, **kwargs)
+
     def train_data(self,
                    training_df: pl.DataFrame, validation_df: pl.DataFrame,
                    epochs: int = 10, batch_size=32, early_stopping: bool = True,
                    patience: int = 10, min_delta: float = 1e-4,
-                   best_model_filename: str = "best_model.h5",
-                   verbose=False,) -> None:
+                   best_model_filename: Optional[str] = None,
+                   verbose=False, silent: bool = False) -> None:
+        self.silent = silent
+        self.verbose = verbose
+        if best_model_filename is None:
+            best_model_filename = f"./best/{self.base_filename}.h5"
+        else:
+            best_model_filename = f"./best/{best_model_filename}.h5"
         best_val_loss = float('inf')
         epochs_no_improve = 0
         best_state = None
         self.epoch_stop = epochs
-        best_model_filename = f"./best/{best_model_filename}.h5"
+        self.best_loss = float('inf')
+        self.best_val_loss = float('inf')
+        self._log(f"Iniciando treinamento do modelo com {epochs} épocas")
         for epoch in range(epochs):
             total_loss = 0.0
             total_val_loss = 0.0
@@ -262,6 +291,11 @@ class Dota2Autoencoder(nn.Module):
             self.avg_history.append(avg_loss)
             self.avg_val_history.append(avg_val_loss)
 
+            if (self.best_loss > avg_loss):
+                self.best_loss = avg_loss
+            if (self.best_val_loss > avg_val_loss):
+                self.best_val_loss = avg_val_loss
+
             # Early stopping e salvamento do melhor modelo
             if early_stopping:
                 if avg_val_loss < best_val_loss - min_delta:
@@ -269,33 +303,35 @@ class Dota2Autoencoder(nn.Module):
                     epochs_no_improve = 0
                     best_state = self.state_dict()
                     # Salva o melhor modelo
-                    self.save_model(best_model_filename)
-                    if verbose:
-                        print(
+                    self.save_model(best_model_filename,
+                                    verbose=self.verbose, silent=self.silent)
+                    if self.verbose and not self.silent:
+                        self._log(
                             f"Melhor modelo salvo em {best_model_filename} (Val Loss: {best_val_loss:.4f})")
                 else:
                     epochs_no_improve += 1
-                    if verbose:
-                        print(
+                    if self.verbose and not self.silent:
+                        self._log(
                             f"Nenhuma melhora na validação por {epochs_no_improve} épocas.")
                 if epochs_no_improve >= patience:
                     self.epoch_stop = epoch + 1
-                    print(f"Early stopping ativado após {epoch+1} épocas.")
-                    print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+                    self._log(f"Early stopping ativado após {epoch+1} épocas.")
+                    self._log(
+                        f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                     break
-
             # Exibe os resultados
-            if (verbose):
-                print(
+            if (self.verbose and not self.silent):
+                self._log(
                     f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
-                print(f'Time taken: {timer_end - timer_start:.2f} seconds')
-            elif ((epoch + 1) % 10 == 0 or epoch == 0):
-                print(
+                self._log(f'Time taken: {timer_end - timer_start:.2f} seconds')
+            elif ((epoch + 1) % 10 == 0 or epoch == 0) and not self.silent:
+                self._log(
                     f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
         # Carrega o melhor modelo ao final do treinamento
         if early_stopping and best_state is not None:
             with torch.serialization.safe_globals([pl.series.series.Series]):
-                self.load_state_dict(torch.load(best_model_filename)['state_dict'])
+                self.load_state_dict(torch.load(
+                    best_model_filename)['state_dict'])
 
     def test_model(self, test_df: pl.DataFrame, batch_size: int = 32, threshold=0.01) -> tuple[float, float, float, float]:
         self.eval()
@@ -321,7 +357,11 @@ class Dota2Autoencoder(nn.Module):
         avg_mse = total_mse / total if total > 0 else 1
         return accuracy, avg_mse, min_mse, max_mse
 
-    def save_model(self, path: str, verbose: bool = False):
+    def save_model(self, path: Optional[str] = None, verbose: bool = False, silent: bool = False):
+        self.silent = silent
+        self.verbose = verbose
+        if path is None:
+            path = f"./best/{self.base_filename}.h5"
         checkpoint = {
             'model_args': {
                 'hero_pick_embedding_dim': self.hero_pick_embedding_dim,
@@ -345,25 +385,30 @@ class Dota2Autoencoder(nn.Module):
             'epoch_stop': self.epoch_stop
         }
         torch.save(checkpoint, path)
-        if(verbose):
-            print(f"Modelo salvo em {path}")
+        if (self.verbose and not self.silent):
+            self._log(f"Modelo salvo em {path}")
 
     @classmethod
-    def load_model(cls, path: str, map_location: torch.device, **override_args):
+    def load_model(cls, path: str, map_location: torch.device, silent: bool = False, **override_args):
         with torch.serialization.safe_globals([pl.series.series.Series]):
             checkpoint = torch.load(path, map_location=map_location)
             model_args = checkpoint['model_args']
             model_args.update(override_args)
-            model = cls(**model_args)
+            model = cls(**model_args, silent=silent)
             model.load_state_dict(checkpoint['state_dict'])
             model.eval()
-            print(f"Modelo carregado de {path}")
+            if not silent:
+                model._log(f"Modelo carregado de {path}")
             return model
 
-    def save_loss_history(self, path: str):
+    def save_loss_history(self, path: Optional[str] = None, silent: bool = False):
+        self.silent = silent
+        if path is None:
+            path = f"./best/{self.base_filename}_loss.csv"
         with open(path, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['loss', 'eval_loss'])
             for loss, eval in zip(self.avg_history, self.avg_val_history):
                 writer.writerow([loss, eval])
-        print(f"Histórico de loss salvo em {path}")
+        if not self.silent:
+            self._log(f"Histórico de loss salvo em {path}")
