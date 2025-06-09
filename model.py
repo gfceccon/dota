@@ -88,11 +88,10 @@ class Dota2Autoencoder(nn.Module):
         self.loss = nn.MSELoss()
 
         # Históricos de loss
-        self.loss_history = []
-        self.avg_history = []
-        self.avg_val_history = []
         self.epoch_stop = 0
-        self.best_loss = float('inf')
+        self.loss_history = []
+        self.val_loss_history = []
+        self.full_loss_history = []
         self.best_val_loss = float('inf')
 
     def compute_input_dim(self):
@@ -239,11 +238,9 @@ class Dota2Autoencoder(nn.Module):
             best_model_filename = f"./best/{self.base_filename}.h5"
         else:
             best_model_filename = f"./best/{best_model_filename}.h5"
-        best_val_loss = float('inf')
         epochs_no_improve = 0
         best_state = None
         self.epoch_stop = epochs
-        self.best_loss = float('inf')
         self.best_val_loss = float('inf')
         self._log(f"Iniciando treinamento do modelo com {epochs} épocas")
         for epoch in range(epochs):
@@ -263,7 +260,7 @@ class Dota2Autoencoder(nn.Module):
                 loss = self.loss(data, reconstructed)
                 loss.backward()
                 self.optimizer.step()
-                self.loss_history.append(loss.item())
+                self.full_loss_history.append(loss.item())
 
                 total_loss += loss.item()
             # Validação do modelo
@@ -287,18 +284,13 @@ class Dota2Autoencoder(nn.Module):
             avg_val_loss = total_val_loss / min(count, 1)
 
             # Armazena os resultados médios
-            self.avg_history.append(avg_loss)
-            self.avg_val_history.append(avg_val_loss)
-
-            if (self.best_loss > avg_loss):
-                self.best_loss = avg_loss
-            if (self.best_val_loss > avg_val_loss):
-                self.best_val_loss = avg_val_loss
+            self.loss_history.append(avg_loss)
+            self.val_loss_history.append(avg_val_loss)
 
             # Early stopping e salvamento do melhor modelo
             if early_stopping:
-                if avg_val_loss < best_val_loss - min_delta:
-                    best_val_loss = avg_val_loss
+                if avg_val_loss < self.best_val_loss - min_delta:
+                    self.best_val_loss = avg_val_loss
                     epochs_no_improve = 0
                     best_state = self.state_dict()
                     # Salva o melhor modelo
@@ -306,7 +298,7 @@ class Dota2Autoencoder(nn.Module):
                                     verbose=self.verbose, silent=self.silent)
                     if self.verbose and not self.silent:
                         self._log(
-                            f"Melhor modelo salvo em {best_model_filename} (Val Loss: {best_val_loss:.4f})")
+                            f"Melhor modelo salvo em {best_model_filename} (Val Loss: {self.best_val_loss:.4f})")
                 else:
                     epochs_no_improve += 1
                     if self.verbose and not self.silent:
@@ -378,8 +370,7 @@ class Dota2Autoencoder(nn.Module):
                 'learning_rate': self.learning_rate
             },
             'state_dict': self.state_dict(),
-            'loss_history': self.loss_history,
-            'best_loss': self.best_loss,
+            'full_loss_history': self.full_loss_history,
             'best_val_loss': self.best_val_loss,
             'epoch_stop': self.epoch_stop
         }
@@ -408,7 +399,7 @@ class Dota2Autoencoder(nn.Module):
         with open(path, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['loss', 'eval_loss'])
-            for loss, eval in zip(self.avg_history, self.avg_val_history):
+            for loss, eval in zip(self.loss_history, self.val_loss_history):
                 writer.writerow([loss, eval])
         if not self.silent:
             self._log(f"Histórico de loss salvo em {path}")

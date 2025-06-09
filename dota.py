@@ -3,7 +3,7 @@ import os
 import kagglehub
 import torch
 from heroes import get_heroes
-from dataset import get_dataset, save_dataset
+from dataset import get_dataset
 from patches import get_patches
 from model import Dota2Autoencoder
 import polars as pl
@@ -25,7 +25,7 @@ class Dota2:
             torch.cuda.manual_seed_all(self.seed)
         pl.set_random_seed(self.seed)
         self.silent = silent
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         self.name = name
         self.base_filename = f"{self.name}_{timestamp}"
         self.log_filename = f"log_{self.base_filename}.txt"
@@ -57,7 +57,7 @@ class Dota2:
             "verbose": False
         }
 
-        _, self.player_cols, self.match_cols, self.hero_cols = get_dataset(
+        self.dataset, self.player_cols, self.match_cols, self.hero_cols = get_dataset(
             path, tier, duration, patches)
 
         self.get_filenames(patches)
@@ -93,7 +93,7 @@ class Dota2:
             learning_rate=self.configuration["learning_rate"],
             verbose=self.configuration["verbose"],
             log_filename=self.log_filename,
-        )
+        ).to(self.autoencoder.device)
         return self.autoencoder
 
     def set_config(self, config: dict, silent: bool = False):
@@ -123,8 +123,11 @@ class Dota2:
         self.should_train = True
         self.create_autoencoder()
 
-    def train_autoencoder(self, train_data, validation_data, test_data, model_path, loss_history_path, epochs=100, silent: bool = False):
+    def train_autoencoder(self, epochs=100, silent: bool = False):
         self.silent = silent
+        train_data, validation_data, test_data = self.prepare_data_splits(
+            self.dataset, silent=self.silent)
+
         self._log("="*50)
         self._log("Iniciando treinamento do Dota2 Autoencoder...")
         self._log(
@@ -134,16 +137,17 @@ class Dota2:
 
         self._log("="*50)
         self._log("Treinando Dota2 Autoencoder...")
-        self.autoencoder.train_data(training_df=train_data, validation_df=validation_data,
-                                    epochs=epochs, verbose=self.configuration["verbose"], silent=self.silent)
+        self.autoencoder.train_data(train_data, validation_data, epochs=epochs,
+                                    verbose=self.configuration["verbose"], silent=self.silent)
         self.autoencoder.save_loss_history(
-            loss_history_path, silent=self.silent)
+            self.loss_history_path, silent=self.silent)
+        self.autoencoder.save_model(self.model_path, silent=self.silent)
 
         self._log("="*50)
         self._log(
-            f"Modelo salvo em {model_path} e histórico de perda salvo em {loss_history_path}.")
+            f"Modelo salvo em {self.model_path} e histórico de perda salvo em {self.loss_history_path}.")
         self._log("Treinamento concluído.")
-        return self.autoencoder, self.autoencoder.best_loss, self.autoencoder.best_val_loss
+        return self.autoencoder, self.autoencoder.best_val_loss
 
     def test_autoencoder(self, test_data: pl.DataFrame, mse_threshold: float = 0.1, silent: bool = False):
         self.silent = silent
@@ -162,7 +166,7 @@ class Dota2:
         self._log(f"MSE máximo: {max_mse:.6f}")
         return accuracy, avg_mse, min_mse, max_mse
 
-    def load_or_prepare_dataset(self, dataset_path: str, metadata_path: str, silent: bool = False):
+    def load_or_prepare_dataset(self, dataset_path: str = "", metadata_path: str = "", silent: bool = False):
         self.silent = silent
         self._log("="*50)
         self._log("Carregando ou preparando o dataset...")
@@ -194,11 +198,11 @@ class Dota2:
             self._log("Dataset carregado e pré-processado com sucesso!")
             return dataset, True
 
-    def save_dataset_and_metadata(self, dataset, dataset_path: str, metadata_path: str, silent: bool = False):
+    def save_dataset_and_metadata(self, dataset: pl.DataFrame, dataset_path: str, metadata_path: str, silent: bool = False):
         self.silent = silent
         self._log("="*50)
-        self._log("Salvando dataset e metadados...")
-        save_dataset(dataset, output_path=dataset_path)
+        print(f"Salvando dataset em {dataset_path}...")
+        dataset.write_json(dataset_path)
         dataset_metadata = pl.DataFrame({
             "n_heroes": [self.n_heroes],
             "n_hero_stats": [self.n_hero_stats],
@@ -222,37 +226,6 @@ class Dota2:
         test_data = dataset.sample(
             fraction=0.15 * df_scale, shuffle=True)
         return train_data, validation_data, test_data
-
-    def train_or_load_autoencoder(self, train_df: pl.DataFrame, val_df: pl.DataFrame, test_df: pl.DataFrame,
-                                  save_model_path: str, save_loss_history_path: str,
-                                  epochs=100, train=False, silent: bool = False) -> tuple[Dota2Autoencoder, float]:
-        self.silent = silent
-        self._log("="*50)
-        self._log(
-            "Iniciando treinamento ou carregamento do modelo de autoencoder...")
-        if self.should_train:
-            train = True
-            self.should_train = False
-
-        # Concatena o caminho relativo ao caminho real
-        save_model_path = os.path.join(os.getcwd(), save_model_path) if not os.path.isabs(
-            save_model_path) else save_model_path
-        save_model_dir = os.path.dirname(save_model_path)
-        if save_model_dir and not os.path.exists(save_model_dir):
-            os.makedirs(save_model_dir, exist_ok=True)
-
-        if (os.path.exists(save_model_path) and train is False):
-            self._log("Carregando modelo treinado...")
-            autoencoder =  Dota2Autoencoder.load_model(save_model_path)
-            return autoencoder, autoencoder.best_loss
-        else:
-            self._log("Treinando novo modelo de autoencoder...")
-            self.autoencoder.train_data(training_df=train_df, validation_df=val_df,
-                                        epochs=epochs, verbose=self.configuration["verbose"], silent=self.silent)
-            self.autoencoder.save_loss_history(
-                save_loss_history_path, silent=self.silent)
-            self.autoencoder.save_model(save_model_path, silent=self.silent)
-            return self.autoencoder, self.autoencoder.best_loss
 
     def get_filenames(self, patches: list[int], silent: bool = False) -> dict[str, str]:
         self.silent = silent
@@ -278,14 +251,13 @@ class Dota2:
         }
 
     def save_report(self, train_data: pl.DataFrame, validation_data: pl.DataFrame, test_data: pl.DataFrame,
-                    patches: list[int], mse_threshold: float, report_path: str,
-                    loss_history_path: str, plot_path: str, silent: bool = False):
+                    report_path: str, loss_history_path: str, plot_path: str, silent: bool = False):
         self.silent = silent
         self._log("="*50)
         self._log("Salvando relatório de desempenho do modelo...")
 
         used_patches = [patch_name for patch_id,
-                        (_, patch_name) in self.patches_info.items() if patch_id in patches]
+                        (_, patch_name) in self.patches_info.items() if patch_id in self.patches]
 
         lines = [
             "="*60,
@@ -296,7 +268,7 @@ class Dota2:
             f"- Treinamento: {train_data.shape[0]} amostras",
             f"- Validação: {validation_data.shape[0]} amostras",
             f"- Teste: {test_data.shape[0]} amostras",
-            f"- Threshold de MSE: {mse_threshold}",
+            f"- Threshold de MSE: {self.mse_threshold}",
             f"- Patches: {', '.join(str(patch) for patch in used_patches)}",
             "",
             "[ARQUIVOS GERADOS]",
@@ -325,14 +297,15 @@ class Dota2:
         lines.append("[INFORMAÇÕES DO TREINAMENTO]")
         lines.append(f"- Épocas: {self.autoencoder.epoch_stop}")
         lines.append(
-            f"- Perda de treino final: {self.autoencoder.avg_history[-1]:.6f}")
+            f"- Perda de treino final: {self.autoencoder.loss_history[-1]:.6f}")
         lines.append(
-            f"- Perda de validação final: {self.autoencoder.avg_val_history[-1]:.6f}")
+            f"- Perda de validação final: {self.autoencoder.val_loss_history[-1]:.6f}")
         lines.append("")
         accuracy, avg_mse, min_mse, max_mse = self.autoencoder.test_model(
-            test_data, threshold=mse_threshold)
+            test_data, threshold=self.mse_threshold)
         lines.append("[RESULTADOS NO CONJUNTO DE TESTE]")
-        lines.append(f"- Acurácia: {accuracy:.2f} (Threshold {mse_threshold})")
+        lines.append(
+            f"- Acurácia: {accuracy:.2f} (Threshold {self.mse_threshold})")
         lines.append(f"- MSE médio: {avg_mse:.6f}")
         lines.append(f"- MSE mínimo: {min_mse:.6f}")
         lines.append(f"- MSE máximo: {max_mse:.6f}")
