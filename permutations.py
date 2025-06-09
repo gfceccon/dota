@@ -2,6 +2,7 @@ import itertools
 import polars as pl
 from dota import Dota2
 from datetime import datetime
+from model import Dota2Autoencoder
 
 learning_rate = [0.001]
 dropout = [0.3]
@@ -34,10 +35,14 @@ def run_permutations(_dota: Dota2, patch: list[int],
     best_permutation_loss = float('inf')
     best_permutation_mse = float('inf')
     best_permutation_accuracy = float('inf')
-    results_filename = f"{permutation_path}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    results_filename = f"{permutation_path}_{datetime.now().strftime('%Y-%m-%d %H-%M-%S')}"
+
     best_permutation_model_path = ""
     best_permutation_loss_path = ""
-    with open(results_filename, "w") as f:
+
+    permutation_models: list[tuple[str, float, float, float, str, str]] = []
+
+    with open(f"{results_filename}.txt", "w") as f:
         f.write("Dota2 Autoencoder Permutation Results\n")
         f.write("=" * 40 + "\n")
     for idx, perm in enumerate(configs):
@@ -53,11 +58,16 @@ def run_permutations(_dota: Dota2, patch: list[int],
         }, True)
         loss_path = f"{loss_filename}_{idx + 1}.csv"
         model_path = f"{model_filename}_{idx + 1}.h5"
-        autoencoder, loss = _dota.train_or_load_autoencoder(
-            train_df, val_df, test_df, model_path, loss_path, epochs=epochs, silent=True)
-        autoencoder.save_model(model_path + f"_{idx + 1}.h5", True)
-        accuracy, avg_mse, _, _ = _dota.test_autoencoder(
-            test_df, 0.1, silent=True)
+
+        autoencoder = _dota.create_autoencoder()
+        autoencoder.train_data(
+            train_df, val_df, best_model_filename=model_path, silent=True)
+        autoencoder.save_loss_history(loss_path, silent=True)
+        accuracy, avg_mse, _, _ = autoencoder.test_model(test_df)
+        loss = autoencoder.best_val_loss
+
+        permutation_models.append(
+            (str(perm), loss, accuracy, avg_mse, model_path, loss_path))
 
         if loss < best_permutation_loss:
             best_permutation_loss = loss
@@ -69,9 +79,9 @@ def run_permutations(_dota: Dota2, patch: list[int],
 
         print(
             f"Permutation {perm}, Loss: {loss}, Accuracy: {accuracy}, Avg MSE: {avg_mse}")
-        with open(results_filename, "a") as f:
+        with open(f"{results_filename}.txt", "a") as f:
             f.write(
-                f"Permutation {idx + 1}/{len(configs)}: {perm}, Loss: {best_permutation_loss}\n")
+                f"Permutation {idx + 1}/{len(configs)}: {perm}, Loss: {loss}\n")
             f.write(
                 f"Accuracy: {accuracy}, Avg MSE: {avg_mse}")
             f.write(f"Model saved to: {model_path}_{idx + 1}.h5\n")
@@ -80,11 +90,27 @@ def run_permutations(_dota: Dota2, patch: list[int],
         f"Best permutation: {best_permutation} with loss {best_permutation_loss}")
     print(
         f"Test Accuracy: {best_permutation_accuracy}, Avg MSE: {best_permutation_mse}")
+
+    pl.DataFrame(permutation_models).write_csv(f"{results_filename}.csv")
+
     plot_path = f"{model_filename}_plot.png"
     report_path = f"{permutation_path}_report.txt"
     try:
-        _dota.save_report(train_df, val_df, test_df, patch, 0.01,
-                          report_path, best_permutation_loss_path, plot_path)
+        _dota.save_report(train_df, val_df, test_df, report_path,
+                          best_permutation_loss_path, plot_path)
     except Exception as e:
         print(f"Error saving report: {e}")
     return best_permutation, best_permutation_loss_path, best_permutation_model_path, plot_path, report_path
+
+
+if __name__ == "__main__":
+    dota = Dota2([55])
+    tr, vl, te = dota.prepare_data_splits(dota.dataset)
+    run_permutations(
+        dota,
+        [55], tr, vl, te,
+        epochs=100,
+        model_filename="./tmp/dota_autoencoder",
+        loss_filename="./tmp/dota_autoencoder_loss",
+        permutation_path="./tmp/dota_autoencoder_permutations"
+    )

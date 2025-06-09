@@ -165,12 +165,6 @@ def get_dataset(
     return dataset, player_cols, match_cols, hero_cols
 
 
-def save_dataset(dataset: pl.DataFrame, output_path: str = "./tmp/DATASET.json") -> None:
-    print(f"Salvando dataset em {output_path}...")
-    dataset.write_json(output_path)
-    print("Dataset salvo com sucesso!")
-
-
 if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
     path = kagglehub.dataset_download(dataset_name)
