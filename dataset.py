@@ -98,7 +98,7 @@ def get_dataset(
         path: str,
         tier: list[str] = ['professional'],
         duration: tuple[int, int] = (30, 120),
-        specific_patches: list[int] = [], verbose: bool = True
+        specific_patches: list[int] = [], verbose: bool = True, split=False
 ) -> tuple[pl.DataFrame, list[str], list[str]]:
     if verbose:
         print(f"Carregando dataset...")
@@ -118,50 +118,90 @@ def get_dataset(
         duration[1] * 60
     )
 
-    dataset = (
-        dataset
-        .with_columns(
-            *[pl.col(f"{team_name}_{stat}").list.get(i).alias(f"{team_name}_{stat}_{i}")
-                for stat in player_cols
-                for team_name in ["radiant", "dire"]
-                for i in range(5)
-              ],
-            *[pl.col(f"{team_name}_hero_{stat}").list.get(i).alias(f"{team_name}_hero_{stat}_{i}")
-                for stat in hero_cols
-                for team_name in ["radiant", "dire"]
-                for i in range(5)
-              ],
-        )
-        .with_columns(
-            *[pl.concat_list([pl.col(f"{team_name}_{stat}_{i}")
-                        for stat in player_cols
-                         for i in range(5)
-                         ]).alias(f"{team_name}_features",)
-                for team_name in ["radiant", "dire"]],
+    if(not split):
+        dataset = (
+            dataset
+            .with_columns(
+                *[pl.col(f"{team_name}_{stat}").list.get(i).alias(f"{team_name}_{stat}_{i}")
+                    for stat in player_cols
+                    for team_name in ["radiant", "dire"]
+                    for i in range(5)
+                ],
+                *[pl.col(f"{team_name}_hero_{stat}").list.get(i).alias(f"{team_name}_hero_{stat}_{i}")
+                    for stat in hero_cols
+                    for team_name in ["radiant", "dire"]
+                    for i in range(5)
+                ],
+            )
+            .with_columns(
+                *[pl.concat_list([pl.col(f"{team_name}_{stat}_{i}")
+                            for stat in player_cols
+                            for i in range(5)
+                            ]).alias(f"{team_name}_features",)
+                    for team_name in ["radiant", "dire"]],
 
 
-            *[pl.concat_list([pl.col(f"{team_name}_hero_{stat}_{i}")
-                        for stat in hero_cols
-                         for i in range(5)
-                         ]).alias(f"{team_name}_hero_features",)
-                for team_name in ["radiant", "dire"]],
+                *[pl.concat_list([pl.col(f"{team_name}_hero_{stat}_{i}")
+                            for stat in hero_cols
+                            for i in range(5)
+                            ]).alias(f"{team_name}_hero_features",)
+                    for team_name in ["radiant", "dire"]],
+            )
+            .select(
+                "match_id",
+                "radiant_hero_roles", "dire_hero_roles",
+                
+                "radiant_picks", "dire_picks",
+                "radiant_bans", "dire_bans",
+                
+                "radiant_picks_idx", "dire_picks_idx",
+                "radiant_bans_idx", "dire_bans_idx",
+                
+                "radiant_features", "dire_features",
+                "radiant_hero_features", "dire_hero_features",
+                "league_id",
+            )
+            .collect()
         )
-        .select(
-            "match_id",
-            "radiant_hero_roles", "dire_hero_roles",
-            
-            "radiant_picks", "dire_picks",
-            "radiant_bans", "dire_bans",
-            
-            "radiant_picks_idx", "dire_picks_idx",
-            "radiant_bans_idx", "dire_bans_idx",
-            
-            "radiant_features", "dire_features",
-            "radiant_hero_features", "dire_hero_features",
-            "league_id",
-        )
-        .collect()
-    )
+    else:
+        dataset = (
+            dataset
+            .with_columns(
+                *[pl.col(f"{team_name}_{stat}").list.get(i).alias(f"{team_name}_{stat}_{i}")
+                    for stat in player_cols
+                    for team_name in ["radiant", "dire"]
+                    for i in range(5)
+                ],
+                *[pl.col(f"{team_name}_hero_{stat}").list.get(i).alias(f"{team_name}_hero_{stat}_{i}")
+                    for stat in hero_cols
+                    for team_name in ["radiant", "dire"]
+                    for i in range(5)
+                ],
+            )
+            .select(
+                "match_id",
+                "radiant_hero_roles", "dire_hero_roles",
+                
+                "radiant_picks", "dire_picks",
+                "radiant_bans", "dire_bans",
+                
+                "radiant_picks_idx", "dire_picks_idx",
+                "radiant_bans_idx", "dire_bans_idx",
+                
+                *[pl.col(f"{team_name}_{stat}").list.get(i).alias(f"{team_name}_{stat}_{i}")
+                    for stat in player_cols
+                    for team_name in ["radiant", "dire"]
+                    for i in range(5)
+                ],
+                *[pl.col(f"{team_name}_hero_{stat}").list.get(i).alias(f"{team_name}_hero_{stat}_{i}")
+                    for stat in hero_cols
+                    for team_name in ["radiant", "dire"]
+                    for i in range(5)
+                ],
+                
+                "league_id",
+            )
+        ).collect()
     return dataset, player_cols, hero_cols
 
 
