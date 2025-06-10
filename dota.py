@@ -47,17 +47,17 @@ class Dota2:
         self.path = path
         self.should_train = True
         self.configuration = {
-            "hero_pick_embedding_dim": 16,
-            "hero_role_embedding_dim": 8,
+            "hero_pick_embedding_dim": 8,
+            "hero_role_embedding_dim": 4,
             "latent_dim": 2,
-            "hidden_layers": [128, 32],
+            "hidden_layers": [128, 64, 32],
             "dropout": 0.3,
             "learning_rate": 0.001,
             "mse_threshold": 0.1,
             "verbose": False
         }
 
-        self.dataset, self.player_cols, self.match_cols, self.hero_cols = get_dataset(
+        self.dataset, self.player_cols, self.hero_cols = get_dataset(
             path, tier, duration, patches)
 
         self.get_filenames(patches)
@@ -83,7 +83,6 @@ class Dota2:
             dict_roles=self.dict_roles,
             hero_cols=self.hero_cols,
             player_cols=self.player_cols,
-            match_cols=self.match_cols,
             n_heroes=self.n_heroes + 1,
             n_players=self.n_players,
             n_bans=self.n_bans,
@@ -177,7 +176,6 @@ class Dota2:
             self.n_hero_stats = dataset_metadata["n_hero_stats"].item()
             self.n_player_stats = dataset_metadata["n_player_stats"].item()
             self.player_cols = dataset_metadata["player_cols"].item()
-            self.match_cols = dataset_metadata["match_cols"].item()
             self.hero_cols = dataset_metadata["hero_cols"].item()
             self.dict_roles = dataset_metadata["self.dict_roles"].item()
             self.patches_info = ast.literal_eval(
@@ -187,7 +185,7 @@ class Dota2:
         else:
             dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
             path = kagglehub.dataset_download(dataset_name)
-            dataset, self.player_cols, self.match_cols, self.hero_cols = get_dataset(
+            dataset, self.player_cols, self.hero_cols = get_dataset(
                 path, specific_patches=self.patches)
             self.heroes, _, _, self.dict_roles = get_heroes(path)
             self.n_heroes = self.heroes.select(
@@ -208,7 +206,6 @@ class Dota2:
             "n_hero_stats": [self.n_hero_stats],
             "n_player_stats": [self.n_player_stats],
             "player_cols": [self.player_cols],
-            "match_cols": [self.match_cols],
             "hero_cols": [self.hero_cols],
             "self.dict_roles": [self.dict_roles],
             "patches_info": [str(self.patches_info)]
@@ -281,8 +278,6 @@ class Dota2:
             f"- Tamanho das colunas de heróis: {len(self.autoencoder.hero_columns)}",
             f"- Colunas de jogadores: {', '.join(self.autoencoder.player_columns)}",
             f"- Tamanho das colunas de jogadores: {len(self.autoencoder.player_columns)}",
-            f"- Colunas de partidas: {', '.join(self.autoencoder.match_columns)}",
-            f"- Tamanho das colunas de partidas: {len(self.autoencoder.match_columns)}",
             "",
             "[ARQUITETURA DO MODELO]",
             f"- Dimensão de embedding (picks de heróis): {self.autoencoder.hero_pick_embedding_dim}",
@@ -347,3 +342,20 @@ class Dota2:
                 [self.configuration['latent_dim']] +
                 list(reversed(self.configuration['hidden_layers'])) + [input_dim])
             })")
+
+    def load_patch(self, patches: list[int], silent: bool = False):
+        self.silent = silent
+        self._log("="*50)
+        self._log("Carregando patches...")
+        self.patches = patches
+        self.get_filenames(patches)
+        self.patches_info = get_patches(self.path)
+        self._log(f"Patches carregados: {self.patches_info}")
+        self.dataset, self.player_cols, self.hero_cols = get_dataset(
+            self.path, specific_patches=self.patches)
+        self.heroes, _, _, self.dict_roles = get_heroes(self.path)
+        self.n_heroes = self.heroes.select("hero_idx").count().collect().item()
+        self.n_hero_stats = len(self.dict_roles) + len(self.hero_cols)
+        self.n_player_stats = len(self.player_cols)
+        self.autoencoder = self.create_autoencoder()
+        return self.patches_info

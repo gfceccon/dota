@@ -23,7 +23,7 @@
 * [x] Tests
 
 ## Clustering
-* [] K-Means
+* [x] K-Means
 * [] DBSCAN
 * [] HDBSCAN
 * [] Visualization

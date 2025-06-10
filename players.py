@@ -11,16 +11,17 @@ def get_players_draft(path: str, matches: pl.LazyFrame) -> tuple[pl.LazyFrame, l
 
     _players_cols = [
         "kills", "deaths", "assists",
-        "hero_id", "player_slot", "account_id",
+        "hero_id", 
+        #"player_slot", "account_id",
         "obs_placed", "sen_placed",
         "gold_per_min", "xp_per_min",
-        "hero_damage", "tower_damage", "hero_healing",
-        "roshan_kills", "tower_kills",
-        "towers_killed", "roshans_killed",
-        "last_hits", "denies",
-        "aghanims_scepter", "aghanims_shard",
-        "total_gold", "total_xp",
-        "purchase_gem", "purchase_rapier",
+        #"hero_damage", "tower_damage", "hero_healing",
+        #"roshan_kills", "tower_kills",
+        #"towers_killed", "roshans_killed",
+        #"last_hits", "denies",
+        #"aghanims_scepter", "aghanims_shard",
+        #"total_gold", "total_xp",
+        #"purchase_gem", "purchase_rapier",
     ]
 
     picks_cols = [

@@ -5,11 +5,13 @@ from matches import get_matches
 from players import get_players_draft
 
 
+from typing import Optional
+
 def preprocess_dataset(path: str, patches: list[int], tier: list[str],
-                       min_duration: int = 10 * 60, max_duration: int = 120 * 60) -> tuple[pl.LazyFrame, list[str], list[str], list[str]]:
+                       min_duration: int = 10 * 60, max_duration: int = 120 * 60) -> tuple[pl.LazyFrame, list[str], list[str]]:
 
     # Carregando e filtrando partidas
-    matches, match_cols = get_matches(path, patches, tier, min_duration, max_duration)
+    matches = get_matches(path, patches, tier, min_duration, max_duration)
 
     # Carregando jogos e draft de jogadores
     games, players_cols, hero_cols = get_players_draft(path, matches)
@@ -72,8 +74,11 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
                 for team_id, team_name in [(0, "radiant"), (1, "dire")]
             ],
             
-            *[pl.col(c).drop_nulls().first().alias(f"match_{c}") for c in match_cols],
+            pl.col("league_id").first().alias("league"),
         )
+        .drop("league_id")
+        .with_columns(
+            pl.col("league").alias("league_id"),)
         .filter(
             (~pl.col("radiant_stats_null").list.any()) &
             (~pl.col("dire_stats_null").list.any()) &
@@ -82,13 +87,11 @@ def preprocess_dataset(path: str, patches: list[int], tier: list[str],
             (pl.col("dire_picks").list.len() == 5) &
 
             (pl.col("radiant_bans").list.len() == 7) &
-            (pl.col("dire_bans").list.len() == 7) &
-            
-            (pl.col("match_winner").is_not_null())
+            (pl.col("dire_bans").list.len() == 7)
         )
     )
 
-    return dataset, players_cols, match_cols, hero_cols
+    return dataset, players_cols, hero_cols
 
 
 def get_dataset(
@@ -96,20 +99,16 @@ def get_dataset(
         tier: list[str] = ['professional'],
         duration: tuple[int, int] = (30, 120),
         specific_patches: list[int] = []
-) -> tuple[pl.DataFrame, list[str], list[str], list[str]]:
+) -> tuple[pl.DataFrame, list[str], list[str]]:
     print(f"Carregando dataset...")
     print(f"Tier: {tier}, Duração: {duration[0]}-{duration[1]} minutos")
     patches = get_patches(path)
-    print("Patches:")
     if specific_patches:
-        for patch_id in specific_patches:
-            [count, name] = patches.get(patch_id, (0, ""))
-            print(f"Patch {name} ({patch_id}): {count} partidas")
+        print(f"Patches: {",".join([f'{patches[patch_id][1]} ({patches[patch_id][0]})' for patch_id in specific_patches])}")
     else:
-        for patch, (count, name) in patches.items():
-            print(f"Patch {name} ({patch}): {count} partidas")
+        print(f"Patches: {",".join([f'{patches[patch_id][1]} ({patches[patch_id][0]})' for patch_id in patches.keys()])}")
 
-    dataset, player_cols, match_cols, hero_cols = preprocess_dataset(
+    dataset, player_cols, hero_cols = preprocess_dataset(
         path,
         list(patches.keys()) if not specific_patches else specific_patches,
         tier,
@@ -157,12 +156,11 @@ def get_dataset(
             
             "radiant_features", "dire_features",
             "radiant_hero_features", "dire_hero_features",
-            
-            *[f"match_{c}" for c in match_cols]
+            "league_id",
         )
         .collect()
     )
-    return dataset, player_cols, match_cols, hero_cols
+    return dataset, player_cols, hero_cols
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@ class Dota2Autoencoder(nn.Module):
         dict_roles: dict[str, int],
         hero_cols: list[str],
         player_cols: list[str],
-        match_cols: list[str],
         n_heroes: int,
         n_players: int = 5,
         n_bans: int = 7,
@@ -58,8 +57,6 @@ class Dota2Autoencoder(nn.Module):
         self.n_player_stats = len(player_cols)
         self.hero_columns = hero_cols
         self.n_heroes_stats = len(hero_cols)
-        self.match_columns = match_cols
-        self.n_match_columns = len(match_cols)
 
         # Camadas de embedding para heróis, bans e estatísticas
         self.hero_pick_embedding = nn.Embedding(
@@ -97,12 +94,11 @@ class Dota2Autoencoder(nn.Module):
     def compute_input_dim(self):
         picks_dim = 2 * self.n_players * self.hero_pick_embedding_dim
         bans_dim = 2 * self.n_bans * self.hero_pick_embedding_dim
-        stats_dim = 2 * self.n_players * self.n_player_stats
-        hero_dim = 2 * self.n_players * self.n_heroes_stats
+        # stats_dim = 2 * self.n_players * self.n_player_stats
+        # hero_stats_dim = 2 * self.n_players * self.n_heroes_stats
         hero_role_dim = 2 * self.n_players * self.n_roles * self.hero_role_embedding_dim
-        match_dim = self.n_match_columns
-        self.input_dim = picks_dim + bans_dim + \
-            stats_dim + hero_role_dim + hero_dim + match_dim
+        self.input_dim = picks_dim + bans_dim + hero_role_dim
+        # self.input_dim = stats_dim + hero_stats_dim
         return self.input_dim
 
     def create_encoder(self, decoder: bool = False, verbose: bool = False) -> nn.Sequential:
@@ -128,12 +124,10 @@ class Dota2Autoencoder(nn.Module):
             idx_dire_bans = columns.index('dire_bans_idx')
             idx_radiant_hero_roles = columns.index('radiant_hero_roles')
             idx_dire_hero_roles = columns.index('dire_hero_roles')
-            idx_radiant_features = columns.index('radiant_features')
-            idx_dire_features = columns.index('dire_features')
-            idx_radiant_hero_features = columns.index('radiant_hero_features')
-            idx_dire_hero_features = columns.index('dire_hero_features')
-            idx_duration = columns.index('match_duration_normalized')
-            idx_radiant_winner = columns.index('match_winner')
+            # idx_radiant_features = columns.index('radiant_features')
+            # idx_dire_features = columns.index('dire_features')
+            # idx_radiant_hero_features = columns.index('radiant_hero_features')
+            # idx_dire_hero_features = columns.index('dire_hero_features')
         except ValueError:
             raise KeyError(f"Column not found in columns list.")
 
@@ -148,15 +142,12 @@ class Dota2Autoencoder(nn.Module):
         dire_hero_roles = np.stack([np.array(d.tolist())
                                    for d in data[:, idx_dire_hero_roles]])
 
-        match_duration = np.stack(data[:, idx_duration].tolist())
-        match_radiant_win = np.stack(data[:, idx_radiant_winner].tolist())
+        #radiant_stats = np.stack(data[:, idx_radiant_features].tolist())
+        #dire_stats = np.stack(data[:, idx_dire_features].tolist())
 
-        radiant_stats = np.stack(data[:, idx_radiant_features].tolist())
-        dire_stats = np.stack(data[:, idx_dire_features].tolist())
-
-        radiant_hero_stats = np.stack(
-            data[:, idx_radiant_hero_features].tolist())
-        dire_hero_stats = np.stack(data[:, idx_dire_hero_features].tolist())
+        #radiant_hero_stats = np.stack(
+        #    data[:, idx_radiant_hero_features].tolist())
+        #dire_hero_stats = np.stack(data[:, idx_dire_hero_features].tolist())
 
         # Picks e bans
         radiant_picks_feat: torch.Tensor = self.hero_pick_embedding(
@@ -178,18 +169,14 @@ class Dota2Autoencoder(nn.Module):
         dire_hero_roles_feat: torch.Tensor = self.hero_role_embedding(
             dire_hero_roles_tensor)
 
-        radiant_stats_tensor = torch.tensor(
-            radiant_stats, device=self.device, dtype=torch.float32)
-        dire_stats_tensor = torch.tensor(
-            dire_stats, device=self.device, dtype=torch.float32)
-        radiant_hero_stats_tensor = torch.tensor(
-            radiant_hero_stats, device=self.device, dtype=torch.float32)
-        dire_hero_stats_tensor = torch.tensor(
-            dire_hero_stats, device=self.device, dtype=torch.float32)
-        match_duration_tensor = torch.tensor(
-            match_duration, device=self.device, dtype=torch.float32)
-        match_radiant_win_tensor = torch.tensor(
-            match_radiant_win, device=self.device, dtype=torch.float32)
+        #radiant_stats_tensor = torch.tensor(
+        #    radiant_stats, device=self.device, dtype=torch.float32)
+        #dire_stats_tensor = torch.tensor(
+        #    dire_stats, device=self.device, dtype=torch.float32)
+        #radiant_hero_stats_tensor = torch.tensor(
+        #    radiant_hero_stats, device=self.device, dtype=torch.float32)
+        #dire_hero_stats_tensor = torch.tensor(
+        #    dire_hero_stats, device=self.device, dtype=torch.float32)
 
         flat = torch.cat([
             radiant_picks_feat.reshape(batch_size, -1),
@@ -198,24 +185,20 @@ class Dota2Autoencoder(nn.Module):
             dire_bans_feat.reshape(batch_size, -1),
             radiant_hero_roles_feat.reshape(batch_size, -1),
             dire_hero_roles_feat.reshape(batch_size, -1),
-            radiant_stats_tensor.reshape(batch_size, -1),
-            dire_stats_tensor.reshape(batch_size, -1),
-            radiant_hero_stats_tensor.reshape(batch_size, -1),
-            dire_hero_stats_tensor.reshape(batch_size, -1),
-            match_duration_tensor.reshape(batch_size, -1),
-            match_radiant_win_tensor.reshape(batch_size, -1),
-        ], dim=1)
+            #radiant_stats_tensor.reshape(batch_size, -1),
+            #dire_stats_tensor.reshape(batch_size, -1),
+            #radiant_hero_stats_tensor.reshape(batch_size, -1),
+            #dire_hero_stats_tensor.reshape(batch_size, -1),
+        ], dim=1).to(self.device)
         return flat
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        # Encoda e decodifica os dados
         latent = self.encoder(x)
         reconstructed = self.decoder(latent)
         return latent, reconstructed
 
     def encode(self, data: np.ndarray[Any, Any], batch_size: int, columns: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
-        _data = np.array(data)
-        tensor = self.flatten(_data, batch_size, columns)
+        tensor = self.flatten(data, batch_size, columns)
         latent, reconstructed = self.forward(tensor)
         return latent, reconstructed
 
@@ -358,7 +341,6 @@ class Dota2Autoencoder(nn.Module):
                 'dict_roles': self.dict_roles,
                 'hero_cols': self.hero_columns,
                 'player_cols': self.player_columns,
-                'match_cols': self.match_columns,
                 'n_heroes': self.n_heroes,
                 'n_players': self.n_players,
                 'n_bans': self.n_bans,

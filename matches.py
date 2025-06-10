@@ -6,7 +6,7 @@ from files import (
 )
 
 
-def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 * 60, max_duration=120*60) -> tuple[pl.LazyFrame, list[str]]:
+def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 * 60, max_duration=120*60) -> pl.LazyFrame:
     leagues = (
         get_lf(Dota2Files.LEAGUES, path)
         .filter(pl.col("tier").is_in(tier))
@@ -39,7 +39,6 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
             *match_cols,
         ])
         .join(other=leagues, on="league_id", how="left")
-        .drop("league_id")
     )
 
-    return matches, match_cols
+    return matches
