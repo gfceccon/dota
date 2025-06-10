@@ -94,11 +94,11 @@ class Dota2Autoencoder(nn.Module):
     def compute_input_dim(self):
         picks_dim = 2 * self.n_players * self.hero_pick_embedding_dim
         bans_dim = 2 * self.n_bans * self.hero_pick_embedding_dim
-        # stats_dim = 2 * self.n_players * self.n_player_stats
-        # hero_stats_dim = 2 * self.n_players * self.n_heroes_stats
+        stats_dim = 2 * self.n_players * self.n_player_stats
+        hero_stats_dim = 2 * self.n_players * self.n_heroes_stats
         hero_role_dim = 2 * self.n_players * self.n_roles * self.hero_role_embedding_dim
-        self.input_dim = picks_dim + bans_dim + hero_role_dim
-        # self.input_dim = stats_dim + hero_stats_dim
+        # Fixed: calculate total input dimension correctly
+        self.input_dim = picks_dim + bans_dim + hero_role_dim + stats_dim + hero_stats_dim
         return self.input_dim
 
     def create_encoder(self, decoder: bool = False, verbose: bool = False) -> nn.Sequential:
@@ -124,10 +124,10 @@ class Dota2Autoencoder(nn.Module):
             idx_dire_bans = columns.index('dire_bans_idx')
             idx_radiant_hero_roles = columns.index('radiant_hero_roles')
             idx_dire_hero_roles = columns.index('dire_hero_roles')
-            # idx_radiant_features = columns.index('radiant_features')
-            # idx_dire_features = columns.index('dire_features')
-            # idx_radiant_hero_features = columns.index('radiant_hero_features')
-            # idx_dire_hero_features = columns.index('dire_hero_features')
+            idx_radiant_features = columns.index('radiant_features')
+            idx_dire_features = columns.index('dire_features')
+            idx_radiant_hero_features = columns.index('radiant_hero_features')
+            idx_dire_hero_features = columns.index('dire_hero_features')
         except ValueError:
             raise KeyError(f"Column not found in columns list.")
 
@@ -142,12 +142,12 @@ class Dota2Autoencoder(nn.Module):
         dire_hero_roles = np.stack([np.array(d.tolist())
                                    for d in data[:, idx_dire_hero_roles]])
 
-        #radiant_stats = np.stack(data[:, idx_radiant_features].tolist())
-        #dire_stats = np.stack(data[:, idx_dire_features].tolist())
+        radiant_stats = np.stack(data[:, idx_radiant_features].tolist())
+        dire_stats = np.stack(data[:, idx_dire_features].tolist())
 
-        #radiant_hero_stats = np.stack(
-        #    data[:, idx_radiant_hero_features].tolist())
-        #dire_hero_stats = np.stack(data[:, idx_dire_hero_features].tolist())
+        radiant_hero_stats = np.stack(
+            data[:, idx_radiant_hero_features].tolist())
+        dire_hero_stats = np.stack(data[:, idx_dire_hero_features].tolist())
 
         # Picks e bans
         radiant_picks_feat: torch.Tensor = self.hero_pick_embedding(
@@ -169,14 +169,14 @@ class Dota2Autoencoder(nn.Module):
         dire_hero_roles_feat: torch.Tensor = self.hero_role_embedding(
             dire_hero_roles_tensor)
 
-        #radiant_stats_tensor = torch.tensor(
-        #    radiant_stats, device=self.device, dtype=torch.float32)
-        #dire_stats_tensor = torch.tensor(
-        #    dire_stats, device=self.device, dtype=torch.float32)
-        #radiant_hero_stats_tensor = torch.tensor(
-        #    radiant_hero_stats, device=self.device, dtype=torch.float32)
-        #dire_hero_stats_tensor = torch.tensor(
-        #    dire_hero_stats, device=self.device, dtype=torch.float32)
+        radiant_stats_tensor = torch.tensor(
+           radiant_stats, device=self.device, dtype=torch.float32)
+        dire_stats_tensor = torch.tensor(
+           dire_stats, device=self.device, dtype=torch.float32)
+        radiant_hero_stats_tensor = torch.tensor(
+           radiant_hero_stats, device=self.device, dtype=torch.float32)
+        dire_hero_stats_tensor = torch.tensor(
+           dire_hero_stats, device=self.device, dtype=torch.float32)
 
         flat = torch.cat([
             radiant_picks_feat.reshape(batch_size, -1),
@@ -185,10 +185,10 @@ class Dota2Autoencoder(nn.Module):
             dire_bans_feat.reshape(batch_size, -1),
             radiant_hero_roles_feat.reshape(batch_size, -1),
             dire_hero_roles_feat.reshape(batch_size, -1),
-            #radiant_stats_tensor.reshape(batch_size, -1),
-            #dire_stats_tensor.reshape(batch_size, -1),
-            #radiant_hero_stats_tensor.reshape(batch_size, -1),
-            #dire_hero_stats_tensor.reshape(batch_size, -1),
+            radiant_stats_tensor.reshape(batch_size, -1),
+            dire_stats_tensor.reshape(batch_size, -1),
+            radiant_hero_stats_tensor.reshape(batch_size, -1),
+            dire_hero_stats_tensor.reshape(batch_size, -1),
         ], dim=1).to(self.device)
         return flat
 

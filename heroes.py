@@ -8,11 +8,11 @@ def get_heroes(path: str):
 
     fixed_hero_cols = ["primary_attribute", "attack_type", "roles_vector"]
     hero_cols = [
-        #"base_health", "base_health_regen", "base_mana", "base_mana_regen",
-        #"base_armor", "base_mr", "base_attack_min", "base_attack_max",
+        "base_health", "base_health_regen", "base_mana", "base_mana_regen",
+        "base_armor", "base_mr", "base_attack_min", "base_attack_max",
         "base_str", "base_agi", "base_int",
-        #"str_gain", "agi_gain", "int_gain",
-        #"attack_range", "attack_rate",
+        "str_gain", "agi_gain", "int_gain",
+        "attack_range", "attack_rate",
     ]
 
     heroes = get_lf(Dota2Files.HEROES, path)
