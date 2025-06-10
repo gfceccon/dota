@@ -1,0 +1,114 @@
+Dota2 Autoencoder Permutation Results
+========================================
+Permutation 1/28: 0_001_0_3_64__32_8_4_2, Loss: 2.5643608751124702e-05
+Accuracy: 1.0, Avg MSE: 8.657539020922351e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32_8_4_2.h5
+----------------------------------------
+Permutation 2/28: 0_001_0_3_64__32_8_4_3, Loss: 8.6409196171644e-05
+Accuracy: 1.0, Avg MSE: 3.5375399493529713e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32_8_4_3.h5
+----------------------------------------
+Permutation 3/28: 0_001_0_3_64__32_8_4_4, Loss: 9.941244275069039e-05
+Accuracy: 1.0, Avg MSE: 3.865415424440601e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32_8_4_4.h5
+----------------------------------------
+Permutation 4/28: 0_001_0_3_64__32_8_4_8, Loss: 7.984974240571319e-05
+Accuracy: 1.0, Avg MSE: 2.8592672996247918e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32_8_4_8.h5
+----------------------------------------
+Permutation 5/28: 0_001_0_3_64__32__16_8_4_2, Loss: 9.949470859282883e-05
+Accuracy: 1.0, Avg MSE: 3.3608575417279748e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32__16_8_4_2.h5
+----------------------------------------
+Permutation 6/28: 0_001_0_3_64__32__16_8_4_3, Loss: 8.02172472873508e-05
+Accuracy: 1.0, Avg MSE: 2.778295618708983e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32__16_8_4_3.h5
+----------------------------------------
+Permutation 7/28: 0_001_0_3_64__32__16_8_4_4, Loss: 4.95307646275478e-06
+Accuracy: 1.0, Avg MSE: 1.6910019378408541e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32__16_8_4_4.h5
+----------------------------------------
+Permutation 8/28: 0_001_0_3_64__32__16_8_4_8, Loss: 3.91371362695736e-05
+Accuracy: 1.0, Avg MSE: 1.2388725809030023e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_64__32__16_8_4_8.h5
+----------------------------------------
+Permutation 9/28: 0_001_0_3_128__64_8_4_2, Loss: 9.463240917284566e-05
+Accuracy: 1.0, Avg MSE: 3.304685029499004e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64_8_4_2.h5
+----------------------------------------
+Permutation 10/28: 0_001_0_3_128__64_8_4_3, Loss: 5.793632089989842e-05
+Accuracy: 1.0, Avg MSE: 2.1950090943586735e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64_8_4_3.h5
+----------------------------------------
+Permutation 11/28: 0_001_0_3_128__64_8_4_4, Loss: 6.47200381536095e-05
+Accuracy: 1.0, Avg MSE: 2.398721457146686e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64_8_4_4.h5
+----------------------------------------
+Permutation 12/28: 0_001_0_3_128__64_8_4_8, Loss: 9.172425484393898e-05
+Accuracy: 1.0, Avg MSE: 3.3612539758515984e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64_8_4_8.h5
+----------------------------------------
+Permutation 13/28: 0_001_0_3_128__64__32_8_4_2, Loss: 3.308685273850642e-05
+Accuracy: 1.0, Avg MSE: 1.2214959091189875e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64__32_8_4_2.h5
+----------------------------------------
+Permutation 14/28: 0_001_0_3_128__64__32_8_4_3, Loss: 5.008701174347152e-05
+Accuracy: 1.0, Avg MSE: 1.509878878940591e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64__32_8_4_3.h5
+----------------------------------------
+Permutation 15/28: 0_001_0_3_128__64__32_8_4_4, Loss: 1.3719349027496719e-05
+Accuracy: 1.0, Avg MSE: 4.905652935300558e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64__32_8_4_4.h5
+----------------------------------------
+Permutation 16/28: 0_001_0_3_128__64__32_8_4_8, Loss: 1.8698254990567875e-05
+Accuracy: 1.0, Avg MSE: 6.019273267757594e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_128__64__32_8_4_8.h5
+----------------------------------------
+Permutation 17/28: 0_001_0_3_256__128_8_4_2, Loss: 8.714249906915938e-05
+Accuracy: 1.0, Avg MSE: 3.11941232666868e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128_8_4_2.h5
+----------------------------------------
+Permutation 18/28: 0_001_0_3_256__128_8_4_3, Loss: 9.079730148187082e-05
+Accuracy: 1.0, Avg MSE: 3.1497921863124896e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128_8_4_3.h5
+----------------------------------------
+Permutation 19/28: 0_001_0_3_256__128_8_4_4, Loss: 3.943176415077687e-05
+Accuracy: 1.0, Avg MSE: 1.4788767239386807e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128_8_4_4.h5
+----------------------------------------
+Permutation 20/28: 0_001_0_3_256__128_8_4_8, Loss: 6.508294910645418e-05
+Accuracy: 1.0, Avg MSE: 1.9609267931335646e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128_8_4_8.h5
+----------------------------------------
+Permutation 21/28: 0_001_0_3_256__128__64_8_4_2, Loss: 2.9397560183497262e-05
+Accuracy: 1.0, Avg MSE: 1.0208450009128813e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64_8_4_2.h5
+----------------------------------------
+Permutation 22/28: 0_001_0_3_256__128__64_8_4_3, Loss: 0.00010023973300121725
+Accuracy: 1.0, Avg MSE: 3.3514449536856513e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64_8_4_3.h5
+----------------------------------------
+Permutation 23/28: 0_001_0_3_256__128__64_8_4_4, Loss: 3.525330875220334e-05
+Accuracy: 1.0, Avg MSE: 1.1116916971738128e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64_8_4_4.h5
+----------------------------------------
+Permutation 24/28: 0_001_0_3_256__128__64_8_4_8, Loss: 1.9886661448254017e-05
+Accuracy: 1.0, Avg MSE: 6.709328965419965e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64_8_4_8.h5
+----------------------------------------
+Permutation 25/28: 0_001_0_3_256__128__64__32_8_4_2, Loss: 0.00010970431685564108
+Accuracy: 1.0, Avg MSE: 3.8120137933869306e-06
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64__32_8_4_2.h5
+----------------------------------------
+Permutation 26/28: 0_001_0_3_256__128__64__32_8_4_3, Loss: 3.445967216464396e-06
+Accuracy: 1.0, Avg MSE: 1.219451178765699e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64__32_8_4_3.h5
+----------------------------------------
+Permutation 27/28: 0_001_0_3_256__128__64__32_8_4_4, Loss: 7.746752359594211e-06
+Accuracy: 1.0, Avg MSE: 2.9614706725007114e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64__32_8_4_4.h5
+----------------------------------------
+Permutation 28/28: 0_001_0_3_256__128__64__32_8_4_8, Loss: 9.55072709984961e-06
+Accuracy: 1.0, Avg MSE: 3.3961729936241423e-07
+Model saved to: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64__32_8_4_8.h5
+----------------------------------------

@@ -1,0 +1,47 @@
+O que foi feito:
+    Dataset:
+    * Escolhas de features relevantes de jogador
+    * Uso de dados finais e não temporal
+    * Pré processamento dos dados
+    * Normalização
+    * Ótima quantidade de dados (entre 4000 a 6000)
+    * Validação 70/15/15
+Autoencoder:
+    * Transformação em features
+    * Embedding de times
+    * Modelagem de diversas arquiteturas
+    * Comparação de loss e cosseno de reconstrução
+    * Autoencoders de 2, 3, 4 e 8 dimensões
+Clustering:
+    * Mostrou falhas ao incluir ganhador do jogo e linearidade reduzindo a quantidade de features
+    * Foi usado K-means, Agglomerative, Gaussian, DBSCAN (retirado por falta de fine-tunning) e OPTICS
+    * Treinamento de torneios profissionais, avaliando as partidas de The International (2021, 2022, 2023, 2024)
+    * Medido com 4 e 6 clusters
+
+Resultados Negativos:
+    Dataset:
+    * Mostrou difícil de pré-processar
+    * Dificuldades com dados temporais
+    * Normalização muito próxima, dado que foi pego apenas estatística finais
+    * Não inclusão de itens afetou extração de relações
+    Autoencoders:
+    * Inclusão de vitória zerou todos os pesos e classificou em dois grupos
+    * Outras features se mostraram lineares
+    * Tamanho de embedding não teve impacto
+    * Não correlacionou os dados, mostrando um problema provavelmente simples ou linear
+    Clustering:
+    * Cluster sem número de clusters especificados mostrou ineficaz
+    * Fine-tunning desses clusters se mostrou difícil
+    * Resultado final indesejado
+Resultados Positivos:
+    Dataset:
+    * Ótima quantidade de dados para treino de uma rede relativamente pequena
+    Autoencoder:
+    * Número de épocas necessárias baixas para um treinamento aceitável
+    * Similaridade e acurácia boas
+    Clustering:
+    * Quando comparado entre diferentes patches, mostrou resultados mais interessantes
+Futuro Estudo
+* Vale investigação de jogos impactantes de jogos anteriores com treinamento do patch atual e vice versa
+* Usar dados temporais para treinamento, com itens
+* Extração de características baseada na descrição e efeitos de habilidades e itens (NLP)

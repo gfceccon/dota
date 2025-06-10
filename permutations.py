@@ -20,7 +20,7 @@ hidden_layers = [
 ]
 hero_pick_embedding_size = [8]
 hero_role_embedding_size = [4]
-latent_dimensions = [2, 4, 8]
+latent_dimensions = [2, 3, 4, 8]
 
 configs = list(itertools.product(
     learning_rate,
@@ -57,7 +57,7 @@ def run_permutations(_dota: Dota2, epochs: int,
             f"Best permutation: {best['permutation']} with loss {best['loss']}")
         print(
             f"Test Accuracy: {best['accuracy']}, Avg MSE: {best['avg_mse']}, Stopped at: {best['stopped']}")
-        return best, best["loss_path"], best["model_path"], None, None
+        return df, best["permutation"], best["loss_path"], best["model_path"], None, None
 
     with open(f"{permutation_path}.txt", "w") as f:
         f.write("Dota2 Autoencoder Permutation Results\n")
@@ -117,7 +117,7 @@ def run_permutations(_dota: Dota2, epochs: int,
     write_report(best, report_path)
 
     shutil.copyfile(best["model_path"], "best.h5")
-    return best, best["loss_path"], best["model_path"], plot_path, report_path
+    return df, best["permutation"], best["loss_path"], best["model_path"], plot_path, report_path
 
 
 def write_report(best, report_path):

@@ -15,8 +15,8 @@ def plot_loss_history(csv_file_path, save_path=None, title="Training and Validat
     
     plt.figure(figsize=(12, 8))
     
-    plt.plot(epochs, train_loss, 'b-', label=f'Training Loss (min: {min_train_loss:.4f})', linewidth=2, marker='o', markersize=4)
-    plt.plot(epochs, val_loss, 'r-', label=f'Validation Loss (min: {min_val_loss:.4f})', linewidth=2, marker='s', markersize=4)
+    plt.plot(epochs, train_loss, 'b-', label=f'Training Loss (min: {min_train_loss:.2e})', linewidth=2, marker='o', markersize=4)
+    plt.plot(epochs, val_loss, 'r-', label=f'Validation Loss (min: {min_val_loss:.2e})', linewidth=2, marker='s', markersize=4)
     
     plt.title(title, fontsize=16, fontweight='bold')
     plt.xlabel('Epoch', fontsize=14)
