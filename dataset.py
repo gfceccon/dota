@@ -98,15 +98,17 @@ def get_dataset(
         path: str,
         tier: list[str] = ['professional'],
         duration: tuple[int, int] = (30, 120),
-        specific_patches: list[int] = []
+        specific_patches: list[int] = [], verbose: bool = True
 ) -> tuple[pl.DataFrame, list[str], list[str]]:
-    print(f"Carregando dataset...")
-    print(f"Tier: {tier}, Duração: {duration[0]}-{duration[1]} minutos")
+    if verbose:
+        print(f"Carregando dataset...")
+        print(f"Tier: {tier}, Duração: {duration[0]}-{duration[1]} minutos")
     patches = get_patches(path)
-    if specific_patches:
-        print(f"Patches: {",".join([f'{patches[patch_id][1]} ({patches[patch_id][0]})' for patch_id in specific_patches])}")
-    else:
-        print(f"Patches: {",".join([f'{patches[patch_id][1]} ({patches[patch_id][0]})' for patch_id in patches.keys()])}")
+    if verbose:
+        if specific_patches:
+            print(f"Patches: {",".join([f'{patches[patch_id][1]} ({patches[patch_id][0]})' for patch_id in specific_patches])}")
+        else:
+            print(f"Patches: {",".join([f'{patches[patch_id][1]} ({patches[patch_id][0]})' for patch_id in patches.keys()])}")
 
     dataset, player_cols, hero_cols = preprocess_dataset(
         path,
