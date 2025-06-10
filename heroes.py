@@ -7,11 +7,13 @@ from files import Dota2Files, get_lf
 def get_heroes(path: str):
 
     fixed_hero_cols = ["primary_attribute", "attack_type", "roles_vector"]
-    hero_cols = ["base_health", "base_health_regen", "base_mana", "base_mana_regen",
-                 "base_armor", "base_mr", "base_attack_min", "base_attack_max",
-                 "base_str", "base_agi", "base_int",
-                 "str_gain", "agi_gain", "int_gain",
-                 "attack_range", "attack_rate",]
+    hero_cols = [
+        #"base_health", "base_health_regen", "base_mana", "base_mana_regen",
+        #"base_armor", "base_mr", "base_attack_min", "base_attack_max",
+        "base_str", "base_agi", "base_int",
+        #"str_gain", "agi_gain", "int_gain",
+        #"attack_range", "attack_rate",
+    ]
 
     heroes = get_lf(Dota2Files.HEROES, path)
     attributes = heroes.select(
@@ -23,7 +25,8 @@ def get_heroes(path: str):
     dict_roles = {role: i for i, role in enumerate(roles)}
     roles_idx = [i for i in dict_roles.values()]
 
-    hero_ids = heroes.select(pl.col("id")).unique().sort("id").collect().to_series().to_list()
+    hero_ids = heroes.select(pl.col("id")).unique().sort(
+        "id").collect().to_series().to_list()
     dict_hero_index = {hid: i for i, hid in enumerate(hero_ids)}
 
     return (
@@ -39,10 +42,12 @@ def get_heroes(path: str):
             pl.col("attack_type").map_elements(
                 lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else None, return_dtype=pl.UInt8
             ).alias("attack_type"),
-            
-            
-            *[pl.col(col).cast(pl.Float32, strict=False).fill_null(strategy="zero").alias(col) for col in hero_cols],
-            pl.col("id").map_elements(lambda x: dict_hero_index.get(x), return_dtype=pl.Int32).alias("hero_idx"),
+
+
+            *[pl.col(col).cast(pl.Float32, strict=False).fill_null(strategy="zero").alias(col)
+              for col in hero_cols],
+            pl.col("id").map_elements(lambda x: dict_hero_index.get(
+                x), return_dtype=pl.Int32).alias("hero_idx"),
         )
         .with_columns(
             pl.col("roles").map_elements(
@@ -60,6 +65,7 @@ def get_heroes(path: str):
         )
 
     ), hero_cols, dict_attributes, dict_roles
+
 
 if __name__ == "__main__":
     dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
