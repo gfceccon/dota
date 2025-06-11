@@ -359,3 +359,7 @@ class Dota2:
         self.n_player_stats = len(self.player_cols)
         self.autoencoder = self.create_autoencoder()
         return self.patches_info
+    
+if __name__ == "__main__":
+    dota2 = Dota2(patches=[56])
+    print(dota2.autoencoder.input_dim)
