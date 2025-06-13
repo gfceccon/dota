@@ -12,6 +12,9 @@
     * Duração
     * GPM / XPM e Evolução
     * Específicos de TI
+
+TODO REMOVER DROPOUT NO DECODER (????)
+COLOCAR SIGMOID???
 ## Código
 * Dota
     * 
