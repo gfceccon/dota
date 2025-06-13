@@ -25,7 +25,9 @@
     "bwandowando",
     "leagueid",
     "leaguename",
+    "logvar",
     "nans",
+    "randn",
     "teamfights"
   ],
   "cSpell.language": "en,pt,pt-BR"
