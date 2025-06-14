@@ -256,6 +256,122 @@ class DotaPlotter:
         
         return fig, ax
     
+    def stacked_bar_plot(
+        self,
+        categories: Union[List, np.ndarray, pd.Series],
+        y1: Union[List, np.ndarray, pd.Series],
+        y2: Union[List, np.ndarray, pd.Series],
+        colors: Optional[Tuple[str, str]] = None,
+        labels: Optional[Tuple[str, str]] = None,
+        title: str = "Stacked Bar Plot",
+        xlabel: str = "Categories",
+        ylabel: str = "Values",
+        figsize: Optional[Tuple[float, float]] = None,
+        save_path: Optional[str] = None,
+        horizontal: bool = False,
+        show_values: bool = True,
+        show_legend: bool = True,
+        rotation: int = 45,
+        invert_colors: bool = False,
+        **kwargs
+    ) -> Tuple[Figure, Axes]:
+        """
+        Create a stacked bar plot with y2 stacked on top of y1
+        
+        Args:
+            categories: Category names
+            y1: Values for bottom bars
+            y2: Values for top bars (stacked on y1)
+            colors: Tuple of colors for (y1, y2) bars
+            labels: Tuple of labels for (y1, y2) in legend
+            title: Plot title
+            xlabel, ylabel: Axis labels
+            figsize: Figure size override
+            save_path: Path to save the plot
+            horizontal: Whether to create horizontal stacked bar plot
+            show_values: Whether to show values on bars
+            show_legend: Whether to show legend
+            rotation: Rotation angle for category labels
+            **kwargs: Additional arguments for bar plot
+        
+        Returns:
+            Tuple of (figure, axes)
+        """
+        fig_size = figsize or self.figsize
+        fig, ax = plt.subplots(figsize=fig_size, dpi=self.dpi)
+        
+        # Default colors and labels
+        default_colors = ('#3498db', '#e74c3c')  # Blue and red
+        colors = colors or default_colors
+        if(invert_colors):
+            colors = (colors[1], colors[0])
+        labels = labels or ('Bottom', 'Top')
+        
+        if horizontal:
+            # Horizontal stacked bars
+            bars1 = ax.barh(categories, y1, color=colors[0], label=labels[0], **kwargs)
+            bars2 = ax.barh(categories, y2, left=y1, color=colors[1], label=labels[1], **kwargs)
+            ax.set_xlabel(ylabel, fontsize=12)
+            ax.set_ylabel(xlabel, fontsize=12)
+            
+            # Add value labels if specified
+            if show_values:
+                for i, (bar1, bar2) in enumerate(zip(bars1, bars2)):
+                    # Label for y1 (bottom/left part)
+                    width1 = bar1.get_width()
+                    ax.text(width1/2, bar1.get_y() + bar1.get_height()/2,
+                           f'{y1[i]:.1f}', ha='center', va='center', fontsize=9, 
+                           color='white', fontweight='bold')
+                    
+                    # Label for y2 (top/right part)
+                    width2 = bar2.get_width()
+                    ax.text(width1 + width2/2, bar2.get_y() + bar2.get_height()/2,
+                           f'{y2[i]:.1f}', ha='center', va='center', fontsize=9, 
+                           color='white', fontweight='bold')
+        else:
+            # Vertical stacked bars
+            bars1 = ax.bar(categories, y1, color=colors[0], label=labels[0], **kwargs)
+            bars2 = ax.bar(categories, y2, bottom=y1, color=colors[1], label=labels[1], **kwargs)
+            ax.set_xlabel(xlabel, fontsize=12)
+            ax.set_ylabel(ylabel, fontsize=12)
+            
+            # Rotate labels if needed
+            if rotation != 0:
+                ax.tick_params(axis='x', rotation=rotation)
+            
+            # Add value labels if specified
+            if show_values:
+                for i, (bar1, bar2) in enumerate(zip(bars1, bars2)):
+                    # Label for y1 (bottom part)
+                    height1 = bar1.get_height()
+                    ax.text(bar1.get_x() + bar1.get_width()/2, height1/2,
+                           f'{y1[i]:.1f}', ha='center', va='center', fontsize=9, 
+                           color='white', fontweight='bold')
+                    
+                    # Label for y2 (top part)
+                    height2 = bar2.get_height()
+                    ax.text(bar2.get_x() + bar2.get_width()/2, height1 + height2/2,
+                           f'{y2[i]:.1f}', ha='center', va='center', fontsize=9, 
+                           color='white', fontweight='bold')
+        
+        ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+        ax.grid(True, alpha=0.3, axis='y' if not horizontal else 'x')
+        
+        # Add legend
+        if show_legend:
+            # Ajusta a posição da legenda para ter margem à esquerda
+            ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1), frameon=True, facecolor='white', edgecolor='gray')
+            # Expande o background do eixo para a direita para acomodar a legenda
+            box = ax.get_position()
+            ax.set_position((box.x0, box.y0, box.width * 0.85, box.height))
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+        
+        return fig, ax
+    
     def grid_plot(
         self,
         data: Union[Dict[str, Tuple], List[Tuple]],
@@ -539,6 +655,129 @@ class DotaPlotter3Col(DotaPlotter):
         
         return fig, axes
     
+    def multi_stacked_bar_plot(
+        self,
+        datasets: List[Dict[str, Any]],
+        titles: Optional[List[str]] = None,
+        figsize: Optional[Tuple[float, float]] = None,
+        save_path: Optional[str] = None,
+        overall_title: str = "Multiple Stacked Bar Plots"
+    ) -> Tuple[Figure, np.ndarray]:
+        """
+        Create multiple stacked bar plots in a 3-column layout
+        
+        Args:
+            datasets: List of dictionaries containing plot data
+                     Format: [{'categories': cats, 'y1': vals1, 'y2': vals2, ...}, ...]
+            titles: List of subplot titles
+            figsize: Figure size override
+            save_path: Path to save the plot
+            overall_title: Overall figure title
+        
+        Returns:
+            Tuple of (figure, axes_array)
+        """
+        n_plots = len(datasets)
+        rows = int(np.ceil(n_plots / self.default_cols))
+        cols = min(n_plots, self.default_cols)
+        
+        fig_size = figsize or (15, 5 * rows)
+        fig, axes = plt.subplots(rows, cols, figsize=fig_size, dpi=self.dpi)
+        
+        # Handle single row case
+        if rows == 1:
+            axes = axes.reshape(1, -1) if n_plots > 1 else np.array([[axes]])
+        
+        plot_titles = titles or [f"Dataset {i+1}" for i in range(n_plots)]
+        
+        for i, (dataset, title) in enumerate(zip(datasets, plot_titles)):
+            row, col = divmod(i, self.default_cols)
+            ax = axes[row, col]
+            
+            # Extract data
+            categories = dataset['categories']
+            y1 = dataset['y1']
+            y2 = dataset['y2']
+            colors = dataset.get('colors', ('#3498db', '#e74c3c'))
+            labels = dataset.get('labels', ('Bottom', 'Top'))
+            horizontal = dataset.get('horizontal', False)
+            invert_colors = dataset.get('invert_colors', False)
+            show_values = dataset.get('show_values', True)
+            show_legend = dataset.get('show_legend', True)
+            
+            if invert_colors:
+                colors = (colors[1], colors[0])
+            
+            if horizontal:
+                # Horizontal stacked bars
+                bars1 = ax.barh(categories, y1, color=colors[0], label=labels[0])
+                bars2 = ax.barh(categories, y2, left=y1, color=colors[1], label=labels[1])
+                ax.set_xlabel(dataset.get('ylabel', 'Values'))
+                ax.set_ylabel(dataset.get('xlabel', 'Categories'))
+                
+                # Add value labels if specified
+                if show_values:
+                    for j, (bar1, bar2) in enumerate(zip(bars1, bars2)):
+                        # Label for y1 (bottom/left part)
+                        width1 = bar1.get_width()
+                        ax.text(width1/2, bar1.get_y() + bar1.get_height()/2,
+                               f'{y1[j]:.1f}', ha='center', va='center', fontsize=8, 
+                               color='white', fontweight='bold')
+                        
+                        # Label for y2 (top/right part)
+                        width2 = bar2.get_width()
+                        ax.text(width1 + width2/2, bar2.get_y() + bar2.get_height()/2,
+                               f'{y2[j]:.1f}', ha='center', va='center', fontsize=8, 
+                               color='white', fontweight='bold')
+            else:
+                # Vertical stacked bars
+                bars1 = ax.bar(categories, y1, color=colors[0], label=labels[0])
+                bars2 = ax.bar(categories, y2, bottom=y1, color=colors[1], label=labels[1])
+                ax.set_xlabel(dataset.get('xlabel', 'Categories'))
+                ax.set_ylabel(dataset.get('ylabel', 'Values'))
+                
+                # Rotate labels if specified
+                rotation = dataset.get('rotation', 45)
+                if rotation != 0:
+                    ax.tick_params(axis='x', rotation=rotation)
+                
+                # Add value labels if specified
+                if show_values:
+                    for j, (bar1, bar2) in enumerate(zip(bars1, bars2)):
+                        # Label for y1 (bottom part)
+                        height1 = bar1.get_height()
+                        ax.text(bar1.get_x() + bar1.get_width()/2, height1/2,
+                               f'{y1[j]:.1f}', ha='center', va='center', fontsize=8, 
+                               color='white', fontweight='bold')
+                        
+                        # Label for y2 (top part)
+                        height2 = bar2.get_height()
+                        ax.text(bar2.get_x() + bar2.get_width()/2, height1 + height2/2,
+                               f'{y2[j]:.1f}', ha='center', va='center', fontsize=8, 
+                               color='white', fontweight='bold')
+            
+            ax.set_title(title, fontsize=12, fontweight='bold')
+            ax.grid(True, alpha=0.3, axis='y' if not horizontal else 'x')
+            
+            # Add legend (compact for subplots)
+            if show_legend:
+                ax.legend(loc='upper right', fontsize=8)
+        
+        # Hide unused subplots
+        total_subplots = rows * cols
+        if n_plots < total_subplots:
+            for i in range(n_plots, total_subplots):
+                row, col = divmod(i, self.default_cols)
+                axes[row, col].set_visible(False)
+        
+        fig.suptitle(overall_title, fontsize=16, fontweight='bold', y=0.98)
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+        
+        return fig, axes
+    
     def comparison_plot(
         self,
         data_2d: List[Dict[str, Any]],
@@ -653,6 +892,12 @@ def quick_bar(categories, values, title="Quick Bar Plot", **kwargs):
     """Quick bar plot"""
     plotter = DotaPlotter()
     return plotter.bar_plot(categories, values, title=title, **kwargs)
+
+
+def quick_stacked_bar(categories, y1, y2, title="Quick Stacked Bar Plot", **kwargs):
+    """Quick stacked bar plot"""
+    plotter = DotaPlotter()
+    return plotter.stacked_bar_plot(categories, y1, y2, title=title, **kwargs)
 
 
 # Default plotter instances
