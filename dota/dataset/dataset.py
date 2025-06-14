@@ -64,27 +64,32 @@ class Dataset:
         self.metadata = self._metadata()
         self.leagues = self._leagues()
 
-    def get_heroes_usage(self) -> pl.LazyFrame:
-        heroes = self._heroes()
-        for year in range(self.years[0], self.years[1]):
-            lf = self.get_year(year)
-            heroes = (
-                lf.select("match_id", "radiant_picks",
-                          "dire_picks", "radiant_bans", "dire_bans")
-                .group_by("match_id")
-                .agg([
-                    pl.col("radiant_picks").list.eval(pl.element().alias(
-                        "hero")).explode().alias("radiant_picks"),
-                    pl.col("dire_picks").list.eval(pl.element().alias(
-                        "hero")).explode().alias("dire_picks"),
-                    pl.col("radiant_bans").list.eval(pl.element().alias(
-                        "hero")).explode().alias("radiant_bans"),
-                    pl.col("dire_bans").list.eval(pl.element().alias(
-                        "hero")).explode().alias("dire_bans")
-                ])
+    def get_heroes_usage(self, year: int) -> pl.LazyFrame:
+        picks_bans = self._picks(year).with_columns(
+            pl.col("hero_id").cast(pl.Float64).alias("hero_id"))
+        lf = (
+            self
+            ._metadata()
+            .join(self.patches, on="patch", how="inner")
+            .filter(pl.col("date").cast(pl.Datetime).dt.year().eq(year))
+            .join(self.leagues, on="leagueid", how="inner")
+            .join(picks_bans, on="match_id", how="inner")
+            .join(self.heroes, on="hero_id", how="inner")
+            .select(
+                [
+                    pl.col("leaguename").alias("league_name"),
+                    pl.col("leagueid").alias("league_id"),
+                    pl.col("is_pick").alias("pick"),
+                    pl.col("patch"),
+                    pl.col("date"),
+                    pl.col("tier"),
+                    pl.col("hero_id"),
+                    pl.col("hero_name"),
+                ]
             )
+        )
 
-        return heroes
+        return lf
 
     def get_year(self, year: int) -> pl.LazyFrame:
         if (self.years[0] > year or self.years[1] <= year):
@@ -94,24 +99,56 @@ class Dataset:
             ._get_lf(METADATA(str(year)), cols.metadata)
             .filter(pl.col("duration").is_between(self.duration[0], self.duration[1]))
         )
-        objectives = self._get_lf(OBJECTIVES(str(year)), cols.objectives)
-        picks_bans = self._get_lf(PICKS_BANS(str(year)),  cols.picks_bans)
-        players = self._get_lf(PLAYERS(str(year)),  cols.players)
-        exp_adv = self._get_lf(EXP_ADV(str(year)), cols.exp_adv)
-        gold_adv = self._get_lf(GOLD_ADV(str(year)),  cols.gold_adv)
-        team_fights = self._get_lf(TEAM_FIGHTS(str(year)), cols.team_fights)
+        objectives = self._objectives(year)
+        picks_bans = self._picks(year)
+        players = self._players(year)
+        exp_adv = self._exp_adv(year)
+        gold_adv = self._gold_adv(year)
+        team_fights = self._team_fights(year)
 
+        game = (
+            metadata
+            .join(picks_bans, on="match_id", how="inner")
+            .join(players, on=["match_id", "hero_id"], how="left")
+            .with_columns([
+                *[
+                    pl.when(pl.col("team").eq(team_id) &
+                            pl.col("is_pick").eq(True))
+                    .then(
+                        pl.concat_list(
+                            [pl.col(f"{stat}").is_null()
+                             for stat in cols.players]
+                        ).list.any())
+                    .otherwise(pl.lit(None))
+                    .alias(f"{team_name}_stats_null")
+                    for team_id, team_name in [(0, "radiant"), (1, "dire")]
+                ],
+                pl.col("is_pick")
+                .eq(False).count().alias("bans_count"),
+                pl.col("is_pick")
+                .eq(True).count().alias("picks_count"),
+            ])
+            .filter(
+                (~pl.col("radiant_stats_null").list.any()) &
+                (~pl.col("dire_stats_null").list.any()) &
+
+                (pl.col("radiant_picks").list.len() == 5) &
+                (pl.col("dire_picks").list.len() == 5) &
+
+                (pl.col("radiant_bans").list.len() == 7) &
+                (pl.col("dire_bans").list.len() == 7)
+            )
+            # .join(self.heroes, on="hero_id", how="inner")
+            # .join(objectives, on="match_id", how="inner")
+            # .join(exp_adv, on="match_id", how="inner")
+            # .join(gold_adv, on="match_id", how="inner")
+            # .join(team_fights, on="match_id", how="inner")
+        )
         metadata = (
             metadata
-            .join(self.leagues, on="leagueid", how="inner")
-            .join(self.patches, on="patch", how="inner")
-            .join(players, on="match_id", how="inner")
-            .join(objectives, on="match_id", how="inner")
-            .join(picks_bans, on="match_id", how="inner")
-            .join(exp_adv, on="match_id", how="inner")
-            .join(gold_adv, on="match_id", how="inner")
-            .join(team_fights, on="match_id", how="inner")
-            .join(self.heroes, on="hero_id", how="inner")
+            .join(game, on="match_id", how="inner")
+            # .join(self.leagues, on="leagueid", how="inner")
+            # .join(self.patches, on="patch", how="inner")
         )
         return self._preprocess(metadata)
 
@@ -121,21 +158,22 @@ class Dataset:
             .group_by("match_id")
             .agg([
                 # Hero picks and bans
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_idx") + 1).drop_nulls().alias("radiant_picks_idx"),
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_idx") + 1).drop_nulls().alias("dire_picks_idx"),
+                # pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
+                #     pl.col("hero_idx") + 1).drop_nulls().alias("radiant_picks_idx"),
+                # pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
+                #     pl.col("hero_idx") + 1).drop_nulls().alias("dire_picks_idx"),
 
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_idx") + 1).drop_nulls().alias("radiant_bans_idx"),
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_idx") + 1).drop_nulls().alias("dire_bans_idx"),
+                # pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
+                #     pl.col("hero_idx") + 1).drop_nulls().alias("radiant_bans_idx"),
+                # pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
+                #     pl.col("hero_idx") + 1).drop_nulls().alias("dire_bans_idx"),
+                pl.col("hero_id").count().alias("picks_count"),
             ])
         )
         return data
 
     def _patches(self) -> pl.LazyFrame:
-        patch_count: dict[int, tuple[int, str]] = {}
+        patch_count: dict[int, tuple[str, str, int]] = {}
         patches_detail = self._get_lf(PATCHES, cols.patches).collect()
         meta = self._metadata().drop_nans("match_id")
         patch_meta = (
@@ -148,12 +186,14 @@ class Dataset:
             patch = row["patch"]
             count = row["count"]
             patch_name = patches_detail.item(patch - 1, 0)
-            patch_count[patch] = (count, patch_name)
+            patch_date = patches_detail.item(patch - 1, 1)
+            patch_count[patch] = (patch_name, patch_date, count)
         return pl.LazyFrame(
             {
                 "patch": list(patch_count.keys()),
-                "count": [x[0] for x in patch_count.values()],
-                "name": [x[1] for x in patch_count.values()]
+                "name": [x[0] for x in patch_count.values()],
+                "date": [x[1] for x in patch_count.values()],
+                "count": [x[2] for x in patch_count.values()],
             }
         ).sort("patch")
 
@@ -192,6 +232,77 @@ class Dataset:
             )
         )
         return heroes
+
+    def _picks(self, year: int) -> pl.LazyFrame:
+        picks_bans = self._get_lf(PICKS_BANS(str(year)), cols.picks_bans)
+        picks = (
+            picks_bans
+            .select(
+                [
+                    pl.col("team"),
+                    pl.col("match_id"),
+                    pl.col("is_pick"),
+                    pl.col("hero_id")
+                    .cast(pl.Float64)
+                    .alias("hero_id"),
+                ]
+            )
+        )
+        return picks
+
+    def _objectives(self, year: int) -> pl.LazyFrame:
+        obj = self._get_lf(OBJECTIVES(str(year)), cols.team_fights)
+
+        objectives = (
+            obj
+            .with_columns([
+                pl.col("type")
+                .replace(cols.obj_types)
+                .alias("obj_type")
+            ])
+        )
+        return objectives
+
+    def _players(self, year: int) -> pl.LazyFrame:
+        players = self._get_lf(PLAYERS(str(year)), cols.team_fights)
+
+        players = (
+            players
+            .with_columns([
+                *[
+                    pl.when(pl.col("team").eq(team_id) &
+                            pl.col("is_pick").eq(True))
+                    .then(
+                        pl.concat_list(
+                            [pl.col(f"{stat}").is_null()
+                             for stat in cols.players]
+                        ).list.any())
+                    .otherwise(pl.lit(None))
+                    .alias(f"{team_name}_stats_null")
+                    for team_id, team_name in [(0, "radiant"), (1, "dire")]
+                ],
+                *[
+                    pl.when(pl.col("team").eq(team_id) &
+                            pl.col("is_pick").eq(True))
+                    .then(
+                        pl.col("roles_vector"))
+                    .otherwise(pl.lit(None))
+                    .alias(f"{team_name}_hero_roles")
+                    for team_id, team_name in [(0, "radiant"), (1, "dire")]
+                ],
+            ])
+        )
+
+        return players
+
+    def _exp_adv(self, year: int) -> pl.LazyFrame:
+        return self._get_lf(EXP_ADV(str(year)), cols.team_fights)
+
+    def _gold_adv(self, year: int) -> pl.LazyFrame:
+        return self._get_lf(GOLD_ADV(str(year)), cols.team_fights)
+
+    def _team_fights(self, year: int) -> pl.LazyFrame:
+        return self._get_lf(TEAM_FIGHTS(str(year)), cols.team_fights)
 
     def _metadata(self) -> pl.LazyFrame:
         files = [METADATA(str(year))

@@ -12,6 +12,16 @@ objectives = [
     "time", "type", "value", "killer", "team", "slot",
     "key", "player_slot", "unit", "match_id",]
 
+obj_types = {
+    "CHAT_MESSAGE_AEGIS": "aegis",
+    "CHAT_MESSAGE_AEGIS_STOLEN": "aegis_stolen",
+    "CHAT_MESSAGE_COURIER_LOST": "courier_lost",
+    "CHAT_MESSAGE_DENIED_AEGIS": "denied_aegis",
+    "CHAT_MESSAGE_FIRSTBLOOD": "first_blood",
+    "CHAT_MESSAGE_ROSHAN_KILL": "roshan_kill",
+    "building_kill": "building_kill",
+}
+
 picks_bans = ["is_pick", "hero_id", "team", "match_id", ]
 
 players = [
