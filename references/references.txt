@@ -1,0 +1,96 @@
+https://www.kaggle.com/datasets/bwandowando/dota-2-pro-league-matches-2023/data
+
+Classification of Player Roles in the Team-Based
+Multi-player Game Dota 2
+Christoph Eggert, Marc Herrlich, Jan Smeddinck, and Rainer Malaka
+Digital Media Lab, TZI, University of Bremen, Germany
+
+
+Unsupervised Deep Embedding for Clustering Analysis
+Junyuan Xie JXIE@CS.WASHINGTON.EDU
+University of Washington
+Ross Girshick RBG@FB.COM
+Facebook AI Research (FAIR)
+Ali Farhadi ALI@CS.WASHINGTON.EDU
+University of Washington
+
+
+A Survey of Clustering With Deep Learning: From
+the Perspective of Network Architecture
+ERXUE MIN , XIFENG GUO, QIANG LIU , (Member, IEEE), GEN ZHANG ,
+JIANJING CUI, AND JUN LONG
+College of Computer, National University of Defense Technology, Changsha 410073, China
+Corresponding authors: Erxue Min (minerxue12@nudt.edu.cn) and Qiang Liu (qiangliu06@nudt.edu.cn)
+This work was supported by the National Natural Science Foundation of China under Grant 60970034, Grant 61105050, Grant 61702539,
+and Grant 6097003.
+
+
+Deep Convolutional Autoencoder for Radar-Based Classification of
+Similar Aided and Unaided Human Activities
+Mehmet Saygın Seyfioğlu – University of Economics and Technology, Turkey
+Ahmet Murat Özbayoğlu – University of Economics and Technology, Turkey
+Sevgi Zubeyde Gürbüz – University of Alabama
+
+
+
+EEG-Based Emotion Classification Using a Deep Neural Network and Sparse Autoencoder
+
+
+Game Play Differences by Expertise
+Level in Dota 2, A Complex
+Multiplayer Video Game
+Lisa Castaneda, foundry10, Seattle, WA, USA
+Manrita Kaur Sidhu, foundry10, Seattle, WA, USA
+Jonathan J. Azose, University of Washington, Seattle, WA, USA
+Tom Swanson, foundry10, Seattle, WA, USA
+
+
+
+The Dota 2 Bot Competition
+Jose M. Font and Tobias Mahlmann
+
+Time to Die: Death Prediction in Dota 2 using
+Deep Learning
+Adam Katona∗
+, Ryan Spick∗
+, Victoria J. Hodge∗
+, Simon Demediuk∗
+,
+Florian Block†
+, Anders Drachen∗
+and James Alfred Walker∗
+, Senior Member, IEEE
+∗Department of Computer Science, University of York, Heslington, York, YO10 5GE, UK
+†Department of Theatre, Film and Television, University of York, Heslington, York, YO10 5GE, UK
+Email: {ak1774, rjs623, victoria.hodge, simon.demediuk, florian.block, anders.drachen, james.walker}@york.ac.uk
+
+
+
+Evaluation Metrics for Unsupervised Learning
+Algorithms
+Julio-Omar Palacio-Nino˜
+Dept. Computer Science and Artificial Intelligence
+Universidad de Granada
+Granada, Spain
+jopalacion@correo.ugr.es
+Fernando Berzal
+Dept. Computer Science and Artificial Intelligence
+Universidad de Granada
+Granada, Spain
+berzal@acm.org
+
+Adaptive Graph Encoder for Attributed Graph Embedding
+Ganqu Cui1,2,3
+, Jie Zhou1,2,3
+, Cheng Yang4∗
+, Zhiyuan Liu1,2,3∗
+1Department of Computer Science and Technology, Tsinghua University
+2
+Institute for Artificial Intelligence, Tsinghua University
+3Beijing National Research Center for Information Science and Technology
+4School of Computer Science, Beijing University of Posts and Telecommunications
+{cgq19,zhoujie18}@mails.tsinghua.edu.cn, albertyang33@gmail.com, liuzy@tsinghua.edu.cn
+
+
+https://github.com/vlukiyanov/pt-sdae
+https://github.com/vlukiyanov/pt-dec
