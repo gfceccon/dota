@@ -6,20 +6,26 @@
     "aghanims",
     "argmin",
     "dota",
+    "firstblood",
     "Github",
     "hiperparâmetros",
     "Kaggle",
     "kagglehub",
     "kmeans",
+    "moonshard",
     "ndarray",
+    "necronomicon",
     "regen",
+    "repicked",
     "roshan",
     "roshans",
     "seduq",
+    "teamfight",
     "zlabel"
   ],
   "cSpell.ignoreWords": [
     "FIRSTBLOOD",
+    "RLIMIT",
     "autoencoder",
     "autoencoders",
     "bwandowando",
@@ -27,8 +33,12 @@
     "leaguename",
     "logvar",
     "nans",
+    "personaname",
     "randn",
-    "teamfights"
+    "randomed",
+    "setrlimit",
+    "teamfights",
+    "vict"
   ],
   "cSpell.language": "en,pt,pt-BR"
 }

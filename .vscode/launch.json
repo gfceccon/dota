@@ -5,27 +5,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Test Autoencoder",
+      "name": "Run Main",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--patches=[56,55]", "--mse_threshold=0.01"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Train Autoencoder",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--patches=[56,55]", "--mse_threshold=0.01", "--train"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Save Dataset",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--save"],
+      "args": [],
       "console": "integratedTerminal"
     }
   ]
