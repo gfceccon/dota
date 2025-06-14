@@ -1,14 +1,17 @@
-import os
-from .dota import Dota2
-from .dataset import Dataset
-from .logger import get_logger
-import logger
-
-os.makedirs("log", exist_ok=True)
-os.makedirs("tmp", exist_ok=True)
-os.makedirs("loss_history", exist_ok=True)
-os.makedirs("reports", exist_ok=True)
-os.makedirs("best", exist_ok=True)
+from dota.dota import Dota2
+from dota.dataset.dataset import Dataset
+from dota.logger import get_logger, LogLevel
+from dota.plot.plot import plotter, plotter_3col
+from dota.autoencoder.autoencoder import Dota2AE
+from dota.autoencoder.cluster import Dota2Cluster
 
 
-__all__ = ["Dota2", "Dataset", "get_logger", "logger"]
+_all__ = [
+    "Dota2",
+    "Dataset",
+    "get_logger",
+    "LogLevel",
+    "plotter",
+    "plotter_3col",
+    "Dota2AE",
+]
