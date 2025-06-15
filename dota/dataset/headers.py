@@ -24,7 +24,7 @@ objectives_type = {
 picks_bans = ["is_pick", "hero_id", "team", "match_id", ]
 
 players = [
-    "hero_id", "match_id",
+    "hero_id", "match_id", "account_id",
     #"obs_placed", "sen_placed",
     "creeps_stacked", "camps_stacked", "rune_pickups",
     "firstblood_claimed",
