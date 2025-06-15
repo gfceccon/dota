@@ -1,0 +1,5 @@
+{
+  "leagueid": "Int64",
+  "leaguename": "String",
+  "tier": "String"
+}
