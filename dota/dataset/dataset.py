@@ -24,7 +24,7 @@ def TEAM_FIGHTS(x): return f"{x}/teamfights.csv"
 class Dataset:
 
     def __init__(self,
-                 duration: tuple[int, int] = (30 * 60, 120 * 60),
+                 duration: tuple[int, int] = (10 * 60, 120 * 60),
                  tier: list[str] = ['professional'],
                  years: tuple[int, int] = (2020, 2025)):
 
@@ -109,7 +109,7 @@ class Dataset:
             metadata
             .join(self.patches, on="patch", how="inner")
             .join(self.leagues, on="leagueid", how="inner")
-            .join(games, on="match_id", how="inner")
+            .join(games, on=["match_id"], how="inner")
             .join(self.heroes, on="hero_id", how="inner")
             .group_by("match_id")
             .agg([
