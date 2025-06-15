@@ -33,6 +33,7 @@
     "leaguename",
     "logvar",
     "nans",
+    "ndjson",
     "personaname",
     "randn",
     "randomed",

@@ -1,4 +1,7 @@
 import ast
+import gc
+import os
+from typing import Optional
 import kagglehub
 import polars as pl
 from dota.logger import LogLevel, get_logger
@@ -26,8 +29,18 @@ class Dataset:
     def __init__(self,
                  duration: tuple[int, int] = (10 * 60, 120 * 60),
                  tier: list[str] = ['professional'],
-                 years: tuple[int, int] = (2020, 2025)):
+                 years: tuple[int, int] = (2020, 2025),
+                 dataset: Optional[
+                     tuple[
+                         pl.LazyFrame,  # Dataset
+                         pl.LazyFrame,  # Heroes
+                         pl.LazyFrame,  # Patches
+                         pl.LazyFrame,  # Metadata
+                         pl.LazyFrame,  # Leagues
+                     ]
+                 ] = None):
 
+        self.data_path = "dota2_data"
         self.dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
         self.path = kagglehub.dataset_download(self.dataset_name)
 
@@ -59,10 +72,24 @@ class Dataset:
             "id").collect().to_series().to_list()
         self.dict_hero_index = {hid: i for i, hid in enumerate(self.hero_ids)}
 
-        self.heroes = self._heroes()
-        self.patches = self._patches()
-        self.metadata = self._metadata()
-        self.leagues = self._leagues()
+        if (dataset is not None):
+            self.data, self.heroes, self.patches, self.metadata, self.leagues = dataset
+            if not isinstance(self.data, pl.LazyFrame):
+                raise TypeError("Dataset must be a LazyFrame")
+            if not isinstance(self.heroes, pl.LazyFrame):
+                raise TypeError("Heroes must be a LazyFrame")
+            if not isinstance(self.patches, pl.LazyFrame):
+                raise TypeError("Patches must be a LazyFrame")
+            if not isinstance(self.metadata, pl.LazyFrame):
+                raise TypeError("Metadata must be a LazyFrame")
+            if not isinstance(self.leagues, pl.LazyFrame):
+                raise TypeError("Leagues must be a LazyFrame")
+        else:
+            self.data = None
+            self.heroes = self._heroes()
+            self.patches = self._patches()
+            self.metadata = self._metadata()
+            self.leagues = self._leagues()
 
     def get_heroes_usage(self, year: int) -> pl.LazyFrame:
         picks_bans = self._picks_bans(year).with_columns(
@@ -281,3 +308,71 @@ class Dataset:
             lf.select(_col for _col in columns)
         )
         return lf
+
+    def save_dataset(self, year: int):
+        if year is not None:
+            if not (self.years[0] <= year < self.years[1]):
+                raise ValueError(
+                    f"Year {year} is not in the range {self.years}")
+        os.makedirs(self.data_path, exist_ok=True)
+        path = f"{self.data_path}/{year}"
+        os.makedirs(path, exist_ok=True)
+
+        df = self.get_year(year).collect()
+        with open(f"{path}/dataset_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{path}/dataset.json")
+        print(f"Year {year} matches:", df.shape[0])
+        df = None
+
+        self._objectives(year).collect().write_json(f"{path}/objectives.json")
+        self._exp_adv(year).collect() .write_json(f"{path}/xp_adv.json")
+        self._gold_adv(year).collect().write_json(f"{path}/gold_adv.json")
+        self._team_fights(year).collect().write_json(
+            f"{path}/team_fights.json")
+        self._picks_bans(year).collect().write_json(f"{path}/picks_bans.json")
+
+    def save_metadata(self):
+        os.makedirs(self.data_path, exist_ok=True)
+
+        df = self.heroes.collect()
+        with open(f"{self.data_path}/heroes_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{self.data_path}/heroes.json")
+
+        df = self.metadata.collect()
+        with open(f"{self.data_path}/metadata_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{self.data_path}/metadata.json")
+
+        df = self.leagues.collect()
+        with open(f"{self.data_path}/leagues_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{self.data_path}/leagues.json")
+
+        df = self.patches.collect()
+        with open(f"{self.data_path}/patches_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{self.data_path}/patches.json")
+
+    @staticmethod
+    def load(year: int) -> tuple[
+            pl.LazyFrame,
+            pl.LazyFrame,
+            pl.LazyFrame,
+            pl.LazyFrame,
+            pl.LazyFrame,]:
+        if not (2020 <= year < 2025):
+            raise ValueError("Year must be between 2020 and 2024")
+        path = f"dota2_data/{year}/dataset.json"
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Dataset for year {year} not found at {path}")
+
+        return (
+            pl.scan_ndjson(path),  # Dataset
+            pl.scan_ndjson(f"dota2_data/heroes.json"),  # Heroes
+            pl.scan_ndjson(f"dota2_data/patches.json"),  # Patches
+            pl.scan_ndjson(f"dota2_data/metadata.json"),  # Metadata
+            pl.scan_ndjson(f"dota2_data/leagues.json"),  # Leagues
+        )
