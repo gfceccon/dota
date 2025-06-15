@@ -1,0 +1,49 @@
+\begin{thebibliography}{}
+
+\bibitem[Boulic and Renault 1991]{boulic:91}
+Boulic, R. and Renault, O. (1991).
+\newblock 3d hierarchies for animation.
+\newblock In Magnenat-Thalmann, N. and Thalmann, D., editors, {\em New Trends in Animation and Visualization}. John Wiley {\&} Sons ltd.
+
+\bibitem[Cadman 2024]{cadman2024studying}
+Cadman, A. (2024).
+\newblock Studying the effects of team composition in role-based competitive video games.
+\newblock Master's thesis, Lancaster University.
+\newblock Department of Computer Science.
+
+\bibitem[Costa et~al. 2023]{costa2023artificial}
+Costa, L.~M., Drachen, A., Souza, F.~C., and Sch{\"o}n, D. (2023).
+\newblock Artificial intelligence in {MOBA} games: A multivocal literature mapping.
+\newblock {\em IEEE Transactions on Games}, 15(3):392--405.
+
+\bibitem[Drachen and Schubert 2016]{drachen2016esports}
+Drachen, A. and Schubert, M. (2016).
+\newblock Esports analytics through encounter detection.
+\newblock In {\em MIT Sloan Sports Analytics Conference}.
+
+\bibitem[Eggert et~al. 2015]{eggert2015classification}
+Eggert, C., Herrlich, M., Smeddinck, J., and Malaka, R. (2015).
+\newblock Classification of player roles in the team-based multi-player game {Dota 2}.
+\newblock In {\em Entertainment Computing--ICEC 2015}, pages 112--125. Springer.
+
+\bibitem[Katona et~al. 2019]{katona2019time}
+Katona, A., Spick, R., Hodge, V.~J., Demediuk, S., Block, F., Drachen, A., and Walker, J.~A. (2019).
+\newblock Time to die: Death prediction in {Dota 2} using deep learning.
+\newblock {\em IEEE Transactions on Games}, 12(3):273--284.
+
+\bibitem[Knuth 1984]{knuth:84}
+Knuth, D.~E. (1984).
+\newblock {\em The {\TeX} Book}.
+\newblock Addison-Wesley, 15th edition.
+
+\bibitem[Schubert et~al. 2016]{schubert2016esports}
+Schubert, M., Drachen, A., and Mahlmann, T. (2016).
+\newblock Esports analytics through encounter detection.
+\newblock In {\em Proceedings of the MIT Sloan Sports Analytics Conference}.
+
+\bibitem[Smith and Jones 1999]{smith:99}
+Smith, A. and Jones, B. (1999).
+\newblock On the complexity of computing.
+\newblock In Smith-Jones, A.~B., editor, {\em Advances in Computer Science}, pages 555--566. Publishing Press.
+
+\end{thebibliography}

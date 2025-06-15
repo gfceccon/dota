@@ -1,6 +1,6 @@
 \documentclass[12pt]{article}
 
-\usepackage{artigo}
+\usepackage{sbc-template}
 \usepackage{graphicx,url}
 \usepackage[utf8]{inputenc}
 \usepackage[main=portuguese,provide=*]{babel}
@@ -30,73 +30,25 @@ Caixa Postal 13506-692 -- (19)3526-9000 -- Rio Claro -- SP -- Brasil
 \maketitle
 
 \begin{abstract}
-  This meta-paper describes the style to be used in articles and short papers
-  for SBC conferences. For papers in English, you should add just an abstract
-  while for the papers in Portuguese, we also ask for an abstract in
-  Portuguese (``resumo''). In both cases, abstracts should not have more than
-  10 lines and must be in the first page of the paper.
+This article explores the application of autoencoder techniques and clustering methods to identify similar professional matches in Dota 2, one of the main games in the MOBA (Multiplayer Online Battle Arena) genre. Using public match data, the paper proposes an approach based on dimensionality reduction and unsupervised clustering to analyze patterns in hero compositions, economic performance and objectives achieved. The method employs Deep Embedded Clustering (DEC) to simultaneously integrate latent representation learning and clustering, demonstrating the relevance of these techniques for eSports analysis and presenting an overview of the most effective methodologies for clustering similar matches.
 \end{abstract}
      
 \begin{resumo} 
-  Este meta-artigo descreve o estilo a ser usado na confecção de artigos e
-  resumos de artigos para publicação nos anais das conferências organizadas
-  pela SBC. É solicitada a escrita de resumo e abstract apenas para os artigos
-  escritos em português. Artigos em inglês deverão apresentar apenas abstract.
-  Nos dois casos, o autor deve tomar cuidado para que o resumo (e o abstract)
-  não ultrapassem 10 linhas cada, sendo que ambos devem estar na primeira
-  página do artigo.
+Este artigo explora a aplicação de técnicas de autoencoders e métodos de clustering para identificar semelhanças entre partidas profissionais de Dota 2, um dos principais jogos do gênero MOBA (Multiplayer Online Battle Arena). Utilizando dados públicos de partidas, o trabalho propõe uma abordagem baseada em redução de dimensionalidade e agrupamento não supervisionado para analisar padrões em composições de heróis, desempenho econômico e objetivos alcançados. O método emprega Deep Embedded Clustering (DEC) para integrar simultaneamente a aprendizagem de representações latentes e a formação de clusters, demonstrando a relevância dessas técnicas para análise de eSports e apresentando um panorama das metodologias mais eficazes para agrupamento de partidas similares.
 \end{resumo}
 
 
-\section{General Information}
+\section{Introdução}
 
-All full papers and posters (short papers) submitted to some SBC conference,
-including any supporting documents, should be written in English or in
-Portuguese. The format paper should be A4 with single column, 3.5 cm for upper
-margin, 2.5 cm for bottom margin and 3.0 cm for lateral margins, without
-headers or footers. The main font must be Times, 12 point nominal size, with 6
-points of space before each paragraph. Page numbers must be suppressed.
+A análise de dados em eSports tem experimentado crescimento devido à riqueza e complexidade dos dados gerados em jogos como Dota 2. O cenário competitivo envolve não apenas jogadores e equipes, mas também analistas, comentaristas e plataformas de estatísticas que buscam prever resultados, identificar padrões estratégicos e fornecer ideias táticas para melhorar o desempenho \cite{drachen2016esports}. Empresas bilionárias patrocinam não só os eventos, mas na área de inteligência artificial, da área de tecnologia como Nvidia, desde 2011 quando o jogo estava surgindo. Outras grandes empresas envolvem alimentícia, como a Monster Energy e Red Bull, móveis como Secretlab e aposta como 1Bet e GG.Bet, além do patrocino dos jogadores para a premiação. Milhões de espectadores e premiações milionárias, tem impulsionado a necessidade de métodos analíticos sofisticados para compreender a dinâmica complexa desses jogos \cite{costa2023artificial}.
 
-Full papers must respect the page limits defined by the conference.
-Conferences that publish just abstracts ask for \textbf{one}-page texts.
+Empresas como SAP e a própria desenvolvedora Valve já fazem estatísticas e análises de jogos de jogos e até em tempo real. Dota plus é uma ferramenta que pode ser adquirida no jogo e mostra estatísticas de decisões e vantagens para o jogo. Durante o jogo os analistas conseguem ver a predição de vitória e derrota, ferramenta disponível já implementada dentro do jogo.
 
-\section{First Page} \label{sec:firstpage}
+Estudos recentes demonstram que a aplicação de aprendizado de máquina em Dota 2 tem sido utilizada para diversas tarefas, incluindo classificação de papéis de jogadores \cite{eggert2015classification}, predição de eventos críticos como mortes de heróis \cite{katona2019time}, análise de composições de equipes \cite{cadman2024studying} e detecção de encontros táticos \cite{schubert2016esports}. No entanto, existe uma lacuna na literatura quanto à análise de similaridade entre partidas inteiras, especialmente utilizando técnicas avançadas de autoencoders e clustering profundo, que podem capturar relações não-lineares complexas nos dados de jogos.
 
-The first page must display the paper title, the name and address of the
-authors, the abstract in English and ``resumo'' in Portuguese (``resumos'' are
-required only for papers written in Portuguese). The title must be centered
-over the whole page, in 16 point boldface font and with 12 points of space
-before itself. Author names must be centered in 12 point font, bold, all of
-them disposed in the same line, separated by commas and with 12 points of
-space after the title. Addresses must be centered in 12 point font, also with
-12 points of space after the authors' names. E-mail addresses should be
-written using font Courier New, 10 point nominal size, with 6 points of space
-before and 6 points of space after.
+O problema central deste trabalho é identificar partidas similares entre si, considerando múltiplas variáveis categóricas e numéricas, com o objetivo de apoiar análises táticas e históricas. Dota 2, como um jogo MOBA complexo, apresenta características únicas que tornam essa análise desafiadora: mais de 120 heróis únicos, milhares de combinações de itens, estratégias emergentes e meta-jogos em constante evolução \cite{Font2019Dota2B}. A identificação de padrões de similaridade entre partidas pode revelar tendências estratégicas, auxiliar na preparação de equipes e fornecer planos valiosos para análise pós-jogo.
 
-The abstract and ``resumo'' (if is the case) must be in 12 point Times font,
-indented 0.8cm on both sides. The word \textbf{Abstract} and \textbf{Resumo},
-should be written in boldface and must precede the text.
-
-\section{CD-ROMs and Printed Proceedings}
-
-In some conferences, the papers are published on CD-ROM while only the
-abstract is published in the printed Proceedings. In this case, authors are
-invited to prepare two final versions of the paper. One, complete, to be
-published on the CD and the other, containing only the first page, with
-abstract and ``resumo'' (for papers in Portuguese).
-
-\section{Sections and Paragraphs}
-
-Section titles must be in boldface, 13pt, flush left. There should be an extra
-12 pt of space before each title. Section numbering is optional. The first
-paragraph of each section should not be indented, while the first lines of
-subsequent paragraphs should be indented by 1.27 cm.
-
-\subsection{Subsections}
-
-The subsection titles must be in boldface, 12pt, flush left.
-
-\section{Figures and Captions}\label{sec:figs}
+A solução proposta envolve a extração de características relevantes das partidas, pré-processamento dos dados, aplicação de técnicas de redução de dimensionalidade usando autoencoders e agrupamento não supervisionado, seguido de análise supervisionada para validação dos clusters formados. O foco está em jogos profissionais, especialmente partidas de campeonatos como The International, utilizando dados compreendendo o período de 2020 a 2024, capturando assim diferentes versões do jogo e evoluções do meta.
 
 
 % Figure and table captions should be centered if less than one line
@@ -120,12 +72,6 @@ The subsection titles must be in boldface, 12pt, flush left.
 % \label{fig:exampleFig2}
 % \end{figure}
 
-In tables, try to avoid the use of colored or shaded backgrounds, and avoid
-thick, doubled, or unnecessary framing lines. When reporting empirical data,
-do not use more decimal digits than warranted by their precision and
-reproducibility. Table caption must be placed before the table (see Table 1)
-and the font used must also be Helvetica, 10 point, boldface, with 6 points of
-space before and after each caption.
 
 % \begin{table}[ht]
 % \centering
@@ -134,15 +80,6 @@ space before and after each caption.
 % \label{tab:exTable1}
 % \includegraphics[width=.7\textwidth]{table.jpg}
 % \end{table}
-
-\section{Images}
-
-All images and illustrations should be in black-and-white, or gray tones,
-excepting for the papers that will be electronically available (on CD-ROMs,
-internet, etc.). The image resolution on paper should be about 600 dpi for
-black-and-white images, and 150-300 dpi for grayscale images.  Do not include
-images with excessive resolution, as they may take hours to print, without any
-visible difference in the result. 
 
 \section{References}
 
@@ -154,7 +91,7 @@ The references must be listed using 12 point font size, with 6 points of space
 before each reference. The first line of each reference should not be
 indented, while the subsequent should be indented by 0.5 cm.
 
-\bibliographystyle{artigo}
+\bibliographystyle{sbc}
 \bibliography{artigo}
 
 \end{document}
