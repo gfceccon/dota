@@ -4,27 +4,28 @@ import polars as pl
 
 if __name__ == "__main__":
     dataset = Dataset()
-    lf = dataset.get_year(2023)
-    # print(lf.collect_schema())
-    # print(lf.explain(optimized=True))
-    #print(lf.head(5).collect())
     for year in range(2020, 2025):
-        usage = dataset.get_heroes_usage(year)
-        # lf = dataset.get_year(year)
-        df_usage = usage.collect()
-        # df = lf.collect()
-        print(f"Year: {year}")
-        hero_usage = (
-            df_usage
-            .group_by(["patch"])
-            .agg([
-                pl.col("hero_id").count().alias("hero_count"),
-                pl.when(pl.col("pick") == True).then(pl.col("hero_id").count()).otherwise(0).alias("picks"),
-                pl.when(pl.col("pick") == False).then(pl.col("hero_id").count()).otherwise(0).alias("bans"),
-            ])
-        )
-
-        usage = None
-        df_usage = None
-        # lf = None
-        # df = None
+        lf = dataset.get_year(year)
+        df = lf.collect()
+        print(f"Year {year} matches:", df.shape[0])
+        df.write_json(f"dota2_matches_{year}.json")
+        
+        df = dataset._objectives(year).collect()
+        df.write_json(f"dota2_{year}_objectives.json")
+        df = dataset._exp_adv(year).collect()
+        df.write_json(f"dota2_{year}_exp_adv.json")
+        df = dataset._gold_adv(year).collect()
+        df.write_json(f"dota2_{year}_gold_adv.json")
+        df = dataset._team_fights(year).collect()
+        df.write_json(f"dota2_{year}_team_fights.json")
+        df = dataset._picks_bans(year).collect()
+        df.write_json(f"dota2_{year}_picks_bans.json")
+    
+    df = dataset.heroes.collect()
+    df.write_json("dota2_heroes.json")
+    df = dataset.metadata.collect()
+    df.write_json("dota2_metadata.json")
+    df = dataset.leagues.collect()
+    df.write_json("dota2_leagues.json")
+    df = dataset.patches.collect()
+    df.write_json("dota2_patches.json")
