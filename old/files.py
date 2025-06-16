@@ -17,7 +17,7 @@ class Dota2Files(Enum):
     PATCHES_NOTES = f"Constants/Constants.PatchNotes.csv"
 
 # Retorna o LazyFrame para o arquivo especificado
-def get_lf(file:Dota2Files, path: str , years: tuple[int, int] = (2020, 2025)) -> pl.LazyFrame:
+def get_lf(file:Dota2Files, path: str , years: tuple[int, int] = (2021, 2025)) -> pl.LazyFrame:
     if(file == Dota2Files.LEAGUES or
        file == Dota2Files.HEROES or
        file == Dota2Files.PATCHES or

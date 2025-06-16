@@ -21,7 +21,7 @@ def get_matches(path: str, patches: list[int], tier: list[str], min_duration=10 
         "winner"
     ]
     matches = (
-        get_lf(Dota2Files.METADATA, path, (2020, 2025))
+        get_lf(Dota2Files.METADATA, path, (2021, 2025))
         .drop_nans(subset="match_id")
         .filter(
             pl.col("patch").is_in(patches),

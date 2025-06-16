@@ -5,7 +5,7 @@
 ## Dataset
 * [x] Pré-processamento
   * [x] Normalização
-  * [x] Patch (2020-2024)
+  * [x] Patch (2021-2024)
   * [x] League (Professional)
   * [x] Heroes (Vector)
     * [x] Attributes (Vector)

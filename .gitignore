@@ -182,7 +182,7 @@ processed_dataset.json
 /models/
 dota2_data/*.json
 dota2_data/**/*.json
-dota2_data/*.txt
+dota2_data/**/*.txt
 pt-sdae-master/.gitignore
 pt-sdae-master/.travis.yml
 pt-sdae-master/confusion.png

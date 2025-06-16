@@ -7,6 +7,7 @@ import polars as pl
 from dota.logger import LogLevel, get_logger
 import dota.dataset.headers as cols
 import dota.dataset.schemas as schema
+
 log = get_logger('dataset', LogLevel.INFO, False)
 
 
@@ -29,7 +30,7 @@ class Dataset:
     def __init__(self,
                  duration: tuple[int, int] = (10 * 60, 120 * 60),
                  tier: list[str] = ['professional', 'premium'],
-                 years: tuple[int, int] = (2020, 2025),
+                 years: tuple[int, int] = (2021, 2025),
                  dataset: Optional[
                      tuple[
                          pl.LazyFrame,  # Dataset
@@ -39,7 +40,6 @@ class Dataset:
                          pl.LazyFrame,  # Leagues
                      ]
                  ] = None):
-
         self.data_path = "dota2_data"
         self.dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
         self.path = kagglehub.dataset_download(self.dataset_name)
@@ -157,16 +157,27 @@ class Dataset:
             .join(objectives, on="match_id", how="inner")
             .join(exp_adv, on="match_id", how="inner")
             .join(gold_adv, on="match_id", how="inner")
+            .with_columns(
+                *[
+                    pl.col(col).str.to_decimal().alias(col)
+                    for col in ["series_type", "series_id", "region"]
+                    if isinstance(pl.col(col), pl.String)]
+            )
+            .with_columns(
+                *[pl.col(col).cast(cast, strict=False).alias(col)
+                  for col, cast
+                  in schema.target_dataset.items()]
+            )
             .select(
                 *[
                     pl.col({col}).list.drop_nulls()
-                    for col in schema.dataset_schema.names()
-                    if schema.dataset_schema[col].is_nested()
+                    for col in schema.target_dataset.names()
+                    if schema.target_dataset[col].is_nested()
                 ],
                 *[
-                    pl.col({col}).drop_nulls()
-                    for col in schema.dataset_schema.names()
-                    if not schema.dataset_schema[col].is_nested()
+                    pl.col({col})
+                    for col in schema.target_dataset.names()
+                    if not schema.target_dataset[col].is_nested()
                 ],
             )
         )
@@ -195,7 +206,7 @@ class Dataset:
                 "date": [x[1] for x in patch_count.values()],
                 "count": [x[2] for x in patch_count.values()],
             }
-        ).sort("patch")
+        )
 
     def _leagues(self) -> pl.LazyFrame:
         leagues = (
@@ -211,12 +222,13 @@ class Dataset:
                 pl.col("primary_attr").map_elements(lambda x: self.dict_attributes.get(x) if isinstance(
                     x, str) else x, return_dtype=pl.Int32).alias("primary_attribute"),
                 pl.col("roles").map_elements(
-                    lambda x: [self.dict_roles.get(y) for y in ast.literal_eval(
-                        x)] if isinstance(x, str) else x,
+                    lambda x: [
+                        self.dict_roles.get(y) for y in ast.literal_eval(x)]
+                        if isinstance(x, str) else x,
                     return_dtype=pl.List(pl.Int32)
                 ),
                 pl.col("attack_type").map_elements(
-                    lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else None, return_dtype=pl.UInt8
+                    lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else -1, return_dtype=pl.Int32
                 ).alias("attack_type"),
                 pl.col("id")
                 .cast(pl.Int32)
@@ -279,7 +291,24 @@ class Dataset:
             players
             .select(cols.players)
             .with_columns(
-                pl.col("hero_id").cast(pl.Int32).alias("hero_id"),)
+                pl.col("hero_id").cast(pl.Int32).alias("hero_id"),
+
+                pl.when(pl.col("purchase_gem") == "")
+                .then(pl.lit(0))
+                .otherwise(pl.col("purchase_gem").str.to_decimal())
+                .cast(pl.Int32)
+                .alias("purchase_gem"),
+
+                pl.when(pl.col("purchase_rapier") == "")
+                .then(pl.lit(0))
+                .otherwise(pl.col("purchase_rapier").str.to_decimal())
+                .cast(pl.Int32)
+                .alias("purchase_rapier"),
+                *[pl.col({col}).str
+                  .extract_all(r"(\d+)")
+                  .list.eval(pl.element().cast(pl.Int32))
+                  .alias(f"{col}") for col in ["lh_t", "dn_t", "xp_t", "gold_t"]]
+            )
             .join(self._picks_bans(year), on=["match_id", "hero_id"], how="right")
         )
 
@@ -298,6 +327,8 @@ class Dataset:
         files = [METADATA(str(year))
                  for year in range(self.years[0], self.years[1])]
         lf, lost = self._get_all_lf(*files)
+        lf = lf.match_to_schema(
+            schema=schema.metadata_schema, extra_columns='ignore')
         log.debug(f"Difference in metadata columns: {lost}")
         return lf
 
@@ -324,7 +355,7 @@ class Dataset:
         )
         return lf
 
-    def save_dataset(self, year: int, head: Optional[int] = None):
+    def save_dataset(self, year: int, sample: int = 0, ti: bool = False):
         if year is not None:
             if not (self.years[0] <= year < self.years[1]):
                 raise ValueError(
@@ -333,45 +364,37 @@ class Dataset:
         path = f"{self.data_path}/{year}"
         os.makedirs(path, exist_ok=True)
 
-        if head is None:
+        if ti is False:
             df = self.get_year(year).collect()
-        else:
+        elif ti is True:
             df = (
                 self.get_year(year)
                 .filter(pl.col("leaguename")
-                .eq(f"The International {year}"))
-                .head(head)
+                        .eq(f"The International {year}"))
                 .collect())
 
-        with open(f"{path}/dataset_schema.txt", "w") as f:
+        if sample > 0:
+            df = df.sample(n=sample, shuffle=True, seed=42)
+
+        with open(f"{path}/dataset_schema{"_ti" if ti else ""}.txt", "w") as f:
             f.write(str(df.collect_schema()))
-        df.write_json(f"{path}/dataset.json")
+        df.write_json(f"{path}/dataset{"_ti" if ti else ""}.json")
 
         print(f"Year {year} matches:", df.shape[0])
 
         df = self._objectives(year).collect()
-        with open(f"{path}/objectives_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
         df.write_json(f"{path}/objectives.json")
 
         df = self._exp_adv(year).collect()
-        with open(f"{path}/xp_adv_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
         df.write_json(f"{path}/xp_adv.json")
 
         df = self._gold_adv(year).collect()
-        with open(f"{path}/gold_adv_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
         df.write_json(f"{path}/gold_adv.json")
 
         df = self._team_fights(year).collect()
-        with open(f"{path}/team_fights_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
         df.write_json(f"{path}/team_fights.json")
 
         df = self._picks_bans(year).collect()
-        with open(f"{path}/picks_bans_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
         df.write_json(f"{path}/picks_bans.json")
 
     def save_metadata(self):
@@ -404,8 +427,8 @@ class Dataset:
             pl.LazyFrame,
             pl.LazyFrame,
             pl.LazyFrame,]:
-        if not (2020 <= year < 2025):
-            raise ValueError("Year must be between 2020 and 2024")
+        if not (2021 <= year < 2025):
+            raise ValueError("Year must be between 2021 and 2024")
         _path = f"{path}/dota2_data/{year}/dataset.json"
         if not os.path.exists(_path):
             raise FileNotFoundError(

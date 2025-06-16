@@ -7,8 +7,9 @@ import polars as pl
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Dota 2 Dataset')
-    parser.add_argument('--year', type=int, help='Ano entre (2020-2024)')
-    parser.add_argument('--head', type=int, help='Salve apenas as primeiras N linhas do dataset', default=None)
+    parser.add_argument('--year', type=int, help='Ano entre (2021-2024)')
+    parser.add_argument('--ti', type=bool, help='Salve dados do The International', default=False)
+    parser.add_argument('--sample', type=int, help='Sample de dados', default=0)
     
     args = parser.parse_args()
 
@@ -17,7 +18,7 @@ if __name__ == "__main__":
     
     if args.year:
         print(f"Processando ano {args.year}...")
-        dataset.save_dataset(args.year, head=args.head)
+        dataset.save_dataset(args.year, args.sample, ti=args.ti)
     else:
         print("Nenhum ano especificado. Apenas os metadados foram salvos.")
-        print("Use o argumento --year para processar dados de um ano específico (2020-2024)")
+        print("Use o argumento --year para processar dados de um ano específico (2021-2024)")

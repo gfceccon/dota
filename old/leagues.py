@@ -10,7 +10,7 @@ from patches import get_patches
 def get_tier_one(path: str, tournaments: list[str] = [], default_tournaments: list[str] =
                  ["The International", "DPC", "Major", "ESL", "PGL",
                   "DreamLeague", "BetBoom", "Blast", "Riyadh Masters", "Invitational"],
-                 years: tuple[int, int] = (2020, 2025)) -> pl.DataFrame:
+                 years: tuple[int, int] = (2021, 2025)) -> pl.DataFrame:
 
     tournaments = tournaments + default_tournaments
     patches_detail = get_lf(Dota2Files.PATCHES, path).collect()
@@ -32,7 +32,7 @@ def get_tier_one(path: str, tournaments: list[str] = [], default_tournaments: li
     )
 
     matches = (
-        get_lf(Dota2Files.METADATA, path, (2020, 2025))
+        get_lf(Dota2Files.METADATA, path, (2021, 2025))
         .drop_nans(["match_id", "leagueid"])
         .with_columns(pl.col("leagueid").alias("league_id"))
         .join(other=leagues, on="league_id", how="left")
