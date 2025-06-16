@@ -1,0 +1,1 @@
+Schema({'team': Int64, 'match_id': Int64, 'is_pick': Boolean, 'hero_id': Int32})

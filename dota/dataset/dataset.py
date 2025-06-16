@@ -6,7 +6,7 @@ import kagglehub
 import polars as pl
 from dota.logger import LogLevel, get_logger
 import dota.dataset.headers as cols
-
+import dota.dataset.schemas as schema
 log = get_logger('dataset', LogLevel.INFO, False)
 
 
@@ -28,7 +28,7 @@ class Dataset:
 
     def __init__(self,
                  duration: tuple[int, int] = (10 * 60, 120 * 60),
-                 tier: list[str] = ['professional'],
+                 tier: list[str] = ['professional', 'premium'],
                  years: tuple[int, int] = (2020, 2025),
                  dataset: Optional[
                      tuple[
@@ -271,10 +271,10 @@ class Dataset:
         return players
 
     def _exp_adv(self, year: int) -> pl.LazyFrame:
-        return self._get_lf(EXP_ADV(str(year)), cols.exp_adv).select(pl.col("exp"), pl.col("minute").alias("exp_minute"), pl.col("match_id")).group_by("match_id").agg(pl.all())
+        return self._get_lf(EXP_ADV(str(year)), cols.exp_adv).select(pl.col("exp").alias("exp_adv"), pl.col("match_id")).group_by("match_id").agg(pl.all())
 
     def _gold_adv(self, year: int) -> pl.LazyFrame:
-        return self._get_lf(GOLD_ADV(str(year)), cols.gold_adv).select(pl.col("gold"), pl.col("minute").alias("gold_minute"), pl.col("match_id")).group_by("match_id").agg(pl.all())
+        return self._get_lf(GOLD_ADV(str(year)), cols.gold_adv).select(pl.col("gold").alias("gold_adv"), pl.col("match_id")).group_by("match_id").agg(pl.all())
 
     def _team_fights(self, year: int) -> pl.LazyFrame:
         return self._get_lf(TEAM_FIGHTS(str(year)), cols.team_fights).group_by("match_id").agg(pl.all())
@@ -309,7 +309,7 @@ class Dataset:
         )
         return lf
 
-    def save_dataset(self, year: int):
+    def save_dataset(self, year: int, head: Optional[int] = None):
         if year is not None:
             if not (self.years[0] <= year < self.years[1]):
                 raise ValueError(
@@ -318,19 +318,58 @@ class Dataset:
         path = f"{self.data_path}/{year}"
         os.makedirs(path, exist_ok=True)
 
-        df = self.get_year(year).collect()
+        if head is None:
+            df = self.get_year(year).collect()
+        else:
+            df = self.get_year(year).filter(
+                pl.col("leaguename")
+                .eq(f"The International {year}")).head(head).collect()
+            
+
+
+        df = df.select(
+            *[
+                pl.col({col}).list.drop_nulls() 
+                for col in schema.dataset_schema.names() 
+                if schema.dataset_schema[col].is_nested()
+            ],
+            *[
+                pl.col({col}).drop_nulls()
+                for col in schema.dataset_schema.names() 
+                if not schema.dataset_schema[col].is_nested()
+            ],
+        )
+
         with open(f"{path}/dataset_schema.txt", "w") as f:
             f.write(str(df.collect_schema()))
         df.write_json(f"{path}/dataset.json")
-        print(f"Year {year} matches:", df.shape[0])
-        df = None
 
-        self._objectives(year).collect().write_json(f"{path}/objectives.json")
-        self._exp_adv(year).collect() .write_json(f"{path}/xp_adv.json")
-        self._gold_adv(year).collect().write_json(f"{path}/gold_adv.json")
-        self._team_fights(year).collect().write_json(
-            f"{path}/team_fights.json")
-        self._picks_bans(year).collect().write_json(f"{path}/picks_bans.json")
+        print(f"Year {year} matches:", df.shape[0])
+
+        df = self._objectives(year).collect()
+        with open(f"{path}/objectives_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{path}/objectives.json")
+
+        df = self._exp_adv(year).collect()
+        with open(f"{path}/xp_adv_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{path}/xp_adv.json")
+
+        df = self._gold_adv(year).collect()
+        with open(f"{path}/gold_adv_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{path}/gold_adv.json")
+
+        df = self._team_fights(year).collect()
+        with open(f"{path}/team_fights_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{path}/team_fights.json")
+
+        df = self._picks_bans(year).collect()
+        with open(f"{path}/picks_bans_schema.txt", "w") as f:
+            f.write(str(df.collect_schema()))
+        df.write_json(f"{path}/picks_bans.json")
 
     def save_metadata(self):
         os.makedirs(self.data_path, exist_ok=True)
@@ -356,7 +395,7 @@ class Dataset:
         df.write_json(f"{self.data_path}/patches.json")
 
     @staticmethod
-    def load(year: int) -> tuple[
+    def load(path: str, year: int) -> tuple[
             pl.LazyFrame,
             pl.LazyFrame,
             pl.LazyFrame,
@@ -364,15 +403,18 @@ class Dataset:
             pl.LazyFrame,]:
         if not (2020 <= year < 2025):
             raise ValueError("Year must be between 2020 and 2024")
-        path = f"dota2_data/{year}/dataset.json"
-        if not os.path.exists(path):
+        _path = f"{path}/dota2_data/{year}/dataset.json"
+        if not os.path.exists(_path):
             raise FileNotFoundError(
-                f"Dataset for year {year} not found at {path}")
-
+                f"Dataset for year {year} not found at {_path}")
         return (
-            pl.scan_ndjson(path),  # Dataset
-            pl.scan_ndjson(f"dota2_data/heroes.json"),  # Heroes
-            pl.scan_ndjson(f"dota2_data/patches.json"),  # Patches
-            pl.scan_ndjson(f"dota2_data/metadata.json"),  # Metadata
-            pl.scan_ndjson(f"dota2_data/leagues.json"),  # Leagues
+            pl.scan_ndjson(_path, schema=schema.dataset_schema),  # Dataset
+            pl.scan_ndjson(f"{path}/dota2_data/heroes.json",
+                           schema=schema.heroes_schema),  # Heroes
+            pl.scan_ndjson(f"{path}/dota2_data/patches.json",
+                           schema=schema.patches_schema),  # Patches
+            pl.scan_ndjson(f"{path}/dota2_data/metadata.json",
+                           schema=schema.metadata_schema),  # Metadata
+            pl.scan_ndjson(f"{path}/dota2_data/leagues.json",
+                           schema=schema.leagues_schema),  # Leagues
         )

@@ -18,7 +18,7 @@ picks_bans_cols = ["is_pick", "hero_id",
 
 players_cols = ["player_slot", "obs_placed", "sen_placed", "creeps_stacked", "camps_stacked", "rune_pickups",
                 "firstblood_claimed", "teamfight_participation", "towers_killed", "roshans_killed", "observers_placed",
-                "stuns", "max_hero_hit", "times", "gold_t", "lh_t", "dn_t", "xp_t", "obs_log", "sen_log",
+                "stuns", "times", "gold_t", "lh_t", "dn_t", "xp_t", "obs_log", "sen_log",
                 "obs_left_log", "sen_left_log", "purchase_log", "kills_log", "buyback_log", "runes_log",
                 "connection_log", "lane_pos", "obs", "sen", "actions", "pings", "purchase", "gold_reasons",
                 "xp_reasons", "killed", "item_uses", "ability_uses", "ability_targets", "damage_targets", "hero_hits",
