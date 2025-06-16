@@ -145,18 +145,30 @@ class Dataset:
                 *[pl.col(_col).first() for _col in
                   set(col for col in [*cols.patches, *cols.leagues, *cols.metadata] if col not in ["match_id",])],
                 pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_id")).drop_nulls().alias("radiant_picks"),
+                    pl.col("hero_idx")).drop_nulls().alias("radiant_picks"),
                 pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_id")).drop_nulls().alias("dire_picks"),
+                    pl.col("hero_idx")).drop_nulls().alias("dire_picks"),
 
                 pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_id")).drop_nulls().alias("radiant_bans"),
+                    pl.col("hero_idx")).drop_nulls().alias("radiant_bans"),
                 pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_id")).drop_nulls().alias("dire_bans"),
+                    pl.col("hero_idx")).drop_nulls().alias("dire_bans"),
             ])
             .join(objectives, on="match_id", how="inner")
             .join(exp_adv, on="match_id", how="inner")
             .join(gold_adv, on="match_id", how="inner")
+            .select(
+                *[
+                    pl.col({col}).list.drop_nulls()
+                    for col in schema.dataset_schema.names()
+                    if schema.dataset_schema[col].is_nested()
+                ],
+                *[
+                    pl.col({col}).drop_nulls()
+                    for col in schema.dataset_schema.names()
+                    if not schema.dataset_schema[col].is_nested()
+                ],
+            )
         )
         return data
 
@@ -207,9 +219,12 @@ class Dataset:
                     lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else None, return_dtype=pl.UInt8
                 ).alias("attack_type"),
                 pl.col("id")
-                .replace(self.dict_hero_index)
                 .cast(pl.Int32)
                 .alias("hero_id"),
+                pl.col("id")
+                .replace(self.dict_hero_index)
+                .cast(pl.Int32)
+                .alias("hero_idx"),
             )
             .with_columns(
                 pl.col("roles").map_elements(
@@ -321,24 +336,12 @@ class Dataset:
         if head is None:
             df = self.get_year(year).collect()
         else:
-            df = self.get_year(year).filter(
-                pl.col("leaguename")
-                .eq(f"The International {year}")).head(head).collect()
-            
-
-
-        df = df.select(
-            *[
-                pl.col({col}).list.drop_nulls() 
-                for col in schema.dataset_schema.names() 
-                if schema.dataset_schema[col].is_nested()
-            ],
-            *[
-                pl.col({col}).drop_nulls()
-                for col in schema.dataset_schema.names() 
-                if not schema.dataset_schema[col].is_nested()
-            ],
-        )
+            df = (
+                self.get_year(year)
+                .filter(pl.col("leaguename")
+                .eq(f"The International {year}"))
+                .head(head)
+                .collect())
 
         with open(f"{path}/dataset_schema.txt", "w") as f:
             f.write(str(df.collect_schema()))
