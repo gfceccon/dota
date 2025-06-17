@@ -4,45 +4,45 @@ The top-level auxiliary file: artigo.aux
 The style file: sbc.bst
 Database file #1: artigo.bib
 Warning--I didn't find a database entry for "Font2019Dota2B"
-You've used 9 entries,
+You've used 18 entries,
             1935 wiz_defined-function locations,
-            528 strings with 5162 characters,
-and the built_in function-call counts, 3846 in all, are:
-= -- 374
-> -- 167
-< -- 7
-+ -- 57
-- -- 55
-* -- 302
-:= -- 662
-add.period$ -- 31
-call.type$ -- 9
-change.case$ -- 71
-chr.to.int$ -- 9
-cite$ -- 9
-duplicate$ -- 161
-empty$ -- 278
-format.name$ -- 70
-if$ -- 774
+            580 strings with 6761 characters,
+and the built_in function-call counts, 7457 in all, are:
+= -- 764
+> -- 266
+< -- 16
++ -- 92
+- -- 88
+* -- 571
+:= -- 1259
+add.period$ -- 61
+call.type$ -- 18
+change.case$ -- 135
+chr.to.int$ -- 18
+cite$ -- 18
+duplicate$ -- 317
+empty$ -- 537
+format.name$ -- 108
+if$ -- 1512
 int.to.chr$ -- 1
 int.to.str$ -- 0
-missing$ -- 9
-newline$ -- 49
-num.names$ -- 31
-pop$ -- 82
+missing$ -- 13
+newline$ -- 95
+num.names$ -- 54
+pop$ -- 134
 preamble$ -- 1
-purify$ -- 71
+purify$ -- 134
 quote$ -- 0
-skip$ -- 111
+skip$ -- 239
 stack$ -- 0
-substring$ -- 224
-swap$ -- 26
-text.length$ -- 2
+substring$ -- 521
+swap$ -- 64
+text.length$ -- 7
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 52
+type$ -- 108
 warning$ -- 0
-while$ -- 30
+while$ -- 64
 width$ -- 0
-write$ -- 121
+write$ -- 242
 (There was 1 warning)

@@ -1,15 +1,20 @@
 \begin{thebibliography}{}
 
-\bibitem[Boulic and Renault 1991]{boulic:91}
-Boulic, R. and Renault, O. (1991).
-\newblock 3d hierarchies for animation.
-\newblock In Magnenat-Thalmann, N. and Thalmann, D., editors, {\em New Trends in Animation and Visualization}. John Wiley {\&} Sons ltd.
+\bibitem[Baldi 2012]{baldi2012autoencoders}
+Baldi, P. (2012).
+\newblock Autoencoders, unsupervised learning, and deep architectures.
+\newblock In {\em Proceedings of ICML workshop on unsupervised and transfer learning}, pages 37--49. JMLR Workshop and Conference Proceedings.
 
 \bibitem[Cadman 2024]{cadman2024studying}
 Cadman, A. (2024).
 \newblock Studying the effects of team composition in role-based competitive video games.
 \newblock Master's thesis, Lancaster University.
 \newblock Department of Computer Science.
+
+\bibitem[Campello et~al. 2013]{campello2013density}
+Campello, R.~J., Moulavi, D., and Sander, J. (2013).
+\newblock Density-based clustering based on hierarchical density estimates.
+\newblock In {\em Pacific-Asia conference on knowledge discovery and data mining}, pages 160--172. Springer.
 
 \bibitem[Costa et~al. 2023]{costa2023artificial}
 Costa, L.~M., Drachen, A., Souza, F.~C., and Sch{\"o}n, D. (2023).
@@ -26,24 +31,65 @@ Eggert, C., Herrlich, M., Smeddinck, J., and Malaka, R. (2015).
 \newblock Classification of player roles in the team-based multi-player game {Dota 2}.
 \newblock In {\em Entertainment Computing--ICEC 2015}, pages 112--125. Springer.
 
+\bibitem[Ij{\"a}s 2021]{ijas2021spatial}
+Ij{\"a}s, T.~T. (2021).
+\newblock Spatial analytics in competitive gaming and e-sports.
+\newblock Master's thesis, University of Helsinki.
+\newblock Department of Geosciences and Geography.
+
+\bibitem[Kamal et~al. 2025]{kamal2025machine}
+Kamal, A.~A., Mansor, M.~A., Truna, L., and Daud, S.~M. (2025).
+\newblock Machine learning applications in multiplayer online battle arena esports: A systematic review.
+\newblock {\em Pertanika Journal of Science \& Technology}, 33(2):461--482.
+
 \bibitem[Katona et~al. 2019]{katona2019time}
 Katona, A., Spick, R., Hodge, V.~J., Demediuk, S., Block, F., Drachen, A., and Walker, J.~A. (2019).
 \newblock Time to die: Death prediction in {Dota 2} using deep learning.
 \newblock {\em IEEE Transactions on Games}, 12(3):273--284.
 
-\bibitem[Knuth 1984]{knuth:84}
-Knuth, D.~E. (1984).
-\newblock {\em The {\TeX} Book}.
-\newblock Addison-Wesley, 15th edition.
+\bibitem[Le 2015]{le2015tutorial}
+Le, Q.~V. (2015).
+\newblock A tutorial on deep learning part 2: Autoencoders, convolutional neural networks and recurrent neural networks.
+\newblock Technical report, Google Brain.
+
+\bibitem[LeCun et~al. 1988]{lecun1988theoretical}
+LeCun, Y., Touresky, D., and Hinton, G. (1988).
+\newblock A theoretical framework for back-propagation.
+\newblock In {\em Proceedings of the 1988 connectionist models summer school}, pages 21--28.
+
+\bibitem[Lloyd 1982]{lloyd1982least}
+Lloyd, S. (1982).
+\newblock Least squares quantization in {PCM}.
+\newblock {\em IEEE Transactions on Information Theory}, 28(2):129--137.
+
+\bibitem[MacQueen 1967]{macqueen1967some}
+MacQueen, J. (1967).
+\newblock Some methods for classification and analysis of multivariate observations.
+\newblock In {\em Proceedings of the fifth Berkeley symposium on mathematical statistics and probability}, volume~1, pages 281--297. Oakland, CA, USA.
+
+\bibitem[OpenAI 2017]{openai2017}
+OpenAI (2017).
+\newblock Dota 2.
+\newblock Acessado em: dezembro 2024.
+
+\bibitem[OpenAI 2018]{openai2018}
+OpenAI (2018).
+\newblock Openai five.
+\newblock Acessado em: dezembro 2024.
+
+\bibitem[Rumelhart et~al. 1986]{rumelhart1986learning}
+Rumelhart, D.~E., Hinton, G.~E., and Williams, R.~J. (1986).
+\newblock Learning representations by back-propagating errors.
+\newblock {\em Nature}, 323(6088):533--536.
 
 \bibitem[Schubert et~al. 2016]{schubert2016esports}
 Schubert, M., Drachen, A., and Mahlmann, T. (2016).
 \newblock Esports analytics through encounter detection.
 \newblock In {\em Proceedings of the MIT Sloan Sports Analytics Conference}.
 
-\bibitem[Smith and Jones 1999]{smith:99}
-Smith, A. and Jones, B. (1999).
-\newblock On the complexity of computing.
-\newblock In Smith-Jones, A.~B., editor, {\em Advances in Computer Science}, pages 555--566. Publishing Press.
+\bibitem[Xie et~al. 2016]{xie2016unsupervised}
+Xie, J., Girshick, R., and Farhadi, A. (2016).
+\newblock Unsupervised deep embedding for clustering analysis.
+\newblock In {\em Proceedings of the 33rd International Conference on Machine Learning (ICML)}, pages 478--487. PMLR.
 
 \end{thebibliography}

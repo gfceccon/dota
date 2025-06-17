@@ -11,7 +11,12 @@
 \usepackage{geometry}
 \usepackage{setspace}
 
-     
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\argmax}{\operatorname*{arg\,max}}
+\DeclareMathOperator{\KL}{KL}
+
+
+
 \sloppy
 
 \title{Uso de Autoencoders e Clustering para\\ Análise de Jogos de Dota 2}
@@ -21,7 +26,7 @@
 
 \address{
 Universidade Estadual Paulista "Júlio de Mesquita Filho"\\
-Caixa Postal 13506-692 -- (19)3526-9000 -- Rio Claro -- SP -- Brasil
+Caixa Postal 13506-692 -- (19) 3526-9000 -- Rio Claro -- SP -- Brasil
 \email{gustavo.ceccon@unesp.br}
 }
 
@@ -42,14 +47,151 @@ Este artigo explora a aplicação de técnicas de autoencoders e métodos de clu
 
 A análise de dados em eSports tem experimentado crescimento devido à riqueza e complexidade dos dados gerados em jogos como Dota 2. O cenário competitivo envolve não apenas jogadores e equipes, mas também analistas, comentaristas e plataformas de estatísticas que buscam prever resultados, identificar padrões estratégicos e fornecer ideias táticas para melhorar o desempenho \cite{drachen2016esports}. Empresas bilionárias patrocinam não só os eventos, mas na área de inteligência artificial, da área de tecnologia como Nvidia, desde 2011 quando o jogo estava surgindo. Outras grandes empresas envolvem alimentícia, como a Monster Energy e Red Bull, móveis como Secretlab e aposta como 1Bet e GG.Bet, além do patrocino dos jogadores para a premiação. Milhões de espectadores e premiações milionárias, tem impulsionado a necessidade de métodos analíticos sofisticados para compreender a dinâmica complexa desses jogos \cite{costa2023artificial}.
 
-Empresas como SAP e a própria desenvolvedora Valve já fazem estatísticas e análises de jogos de jogos e até em tempo real. Dota plus é uma ferramenta que pode ser adquirida no jogo e mostra estatísticas de decisões e vantagens para o jogo. Durante o jogo os analistas conseguem ver a predição de vitória e derrota, ferramenta disponível já implementada dentro do jogo.
-
 Estudos recentes demonstram que a aplicação de aprendizado de máquina em Dota 2 tem sido utilizada para diversas tarefas, incluindo classificação de papéis de jogadores \cite{eggert2015classification}, predição de eventos críticos como mortes de heróis \cite{katona2019time}, análise de composições de equipes \cite{cadman2024studying} e detecção de encontros táticos \cite{schubert2016esports}. No entanto, existe uma lacuna na literatura quanto à análise de similaridade entre partidas inteiras, especialmente utilizando técnicas avançadas de autoencoders e clustering profundo, que podem capturar relações não-lineares complexas nos dados de jogos.
 
 O problema central deste trabalho é identificar partidas similares entre si, considerando múltiplas variáveis categóricas e numéricas, com o objetivo de apoiar análises táticas e históricas. Dota 2, como um jogo MOBA complexo, apresenta características únicas que tornam essa análise desafiadora: mais de 120 heróis únicos, milhares de combinações de itens, estratégias emergentes e meta-jogos em constante evolução \cite{Font2019Dota2B}. A identificação de padrões de similaridade entre partidas pode revelar tendências estratégicas, auxiliar na preparação de equipes e fornecer planos valiosos para análise pós-jogo.
 
-A solução proposta envolve a extração de características relevantes das partidas, pré-processamento dos dados, aplicação de técnicas de redução de dimensionalidade usando autoencoders e agrupamento não supervisionado, seguido de análise supervisionada para validação dos clusters formados. O foco está em jogos profissionais, especialmente partidas de campeonatos como The International, utilizando dados compreendendo o período de 2020 a 2024, capturando assim diferentes versões do jogo e evoluções do meta.
+A solução proposta envolve a extração de características relevantes das partidas, pré-processamento dos dados, aplicação de técnicas de redução de dimensionalidade usando autoencoders e agrupamento não supervisionado, seguido de análise supervisionada para validação dos clusters formados. O foco está em jogos profissionais, especialmente partidas de campeonatos como The International, utilizando dados compreendendo o período de 2021 a 2024, capturando assim diferentes versões do jogo e evoluções do meta.
 
+\section{Fundamentação Teórica}
+
+\subsection{Análise de eSports e Jogos MOBA}
+
+A análise de dados em eSports, particularmente em jogos MOBA, representa um campo emergente que combina elementos de ciência da computação, estatística e estudos de jogos \cite{drachen2016esports}. MOBAs como Dota 2 geram grandes volumes de dados telemétricos durante cada partida, incluindo posições de jogadores, uso de habilidades, economia do jogo, e interações complexas entre elementos do jogo \cite{kamal2025machine}. Esta riqueza de dados oferece oportunidades únicas para aplicação de técnicas de aprendizado de máquina e mineração de dados.
+
+Empresas como SAP e a própria desenvolvedora Valve já fazem estatísticas e análises de jogos de jogos em tempo real.
+A OpenAI, explorou a área de agentes (robôs) \cite{openai2017}, e testaram contra jogadores profissionais no maior torneio, The International \cite{openai2018}. Dota plus é uma ferramenta que pode ser adquirida no jogo e mostra estatísticas de decisões e vantagens para o jogo. Durante o jogo os analistas conseguem ver a predição de vitória e derrota, ferramenta disponível já implementada dentro do jogo.
+
+Trabalhos recentes em análises de eSports têm focado em diferentes aspectos: \cite{schubert2016esports} desenvolveram métodos para detecção automática de encontros em Dota 2, demonstrando como eventos de combate podem ser identificados e analisados; \cite{costa2023artificial} realizaram um mapeamento sistemático da literatura sobre inteligência artificial em jogos MOBA, identificando tendências e lacunas de pesquisa; e \cite{ijas2021spatial} explorou análises espaciais em jogos competitivos, mostrando como a análise de posicionamento pode revelar padrões estratégicos.
+
+\subsection{Autoencoders: Redução de Dimensionalidade e Extração de Características}
+
+Autoencoders são uma classe de redes neurais artificiais projetadas para aprendizagem de representações não supervisionada, introduzidas inicialmente por \cite{rumelhart1986learning} como parte do desenvolvimento de redes neurais e \cite{lecun1988theoretical} para a retro-propagação. Matematicamente, um autoencoder consiste em duas funções principais: um encoder $f_\theta$ que mapeia dados de entrada $\mathbf{x} \in \mathbb{R}^d$ para uma representação latente $\mathbf{h} \in \mathbb{R}^k$ (onde tipicamente $k < d$), e um decoder $g_\phi$ que reconstrói os dados originais a partir da representação latente.
+
+A função de encoder é definida como:
+\begin{equation}
+\mathbf{h} = f_\theta(\mathbf{x}) = \sigma(\mathbf{W}\mathbf{x} + \mathbf{b})
+\end{equation}
+
+onde $\mathbf{W} \in \mathbb{R}^{k \times d}$ é a matriz de pesos, $\mathbf{b} \in \mathbb{R}^k$ é o vetor de bias, e $\sigma$ é uma função de ativação não-linear. O decoder é definido analogamente como:
+\begin{equation}
+\hat{\mathbf{x}} = g_\phi(\mathbf{h}) = \sigma'(\mathbf{W}'\mathbf{h} + \mathbf{b}')
+\end{equation}
+
+O objetivo do treinamento é minimizar a função de perda de reconstrução:
+\begin{equation}
+\mathcal{L}(\mathbf{x}, \hat{\mathbf{x}}) = \|\mathbf{x} - \hat{\mathbf{x}}\|^2
+\end{equation}
+
+Diferentes variações de autoencoders foram desenvolvidas para aplicações específicas, incluindo Autoencoders Variacionais (VAE) para modelagem probabilística, (SAE) Autoencoders Esparsos para aprendizagem de características esparsas, e (CAE) Autoencoders de Remoção de Ruído para robustez a ruído \cite{baldi2012autoencoders, le2015tutorial}.
+
+
+\subsection{Clustering: Algoritmos Clássicos e Aprendizagem Profunda}
+
+O agrupamento (clustering) é uma tarefa fundamental em aprendizado não supervisionado que busca particionar dados em grupos homogêneos. O algoritmo k-médias, proposto por \cite{macqueen1967some} e formalizado por \cite{lloyd1982least}, permanece como um dos métodos mais utilizados. O k-médias minimiza a soma dos quadrados intra-grupo:
+
+\begin{equation}
+J = \sum_{i=1}^{n} \sum_{j=1}^{k} w_{ij}\|\mathbf{x}_i - \boldsymbol{\mu}_j\|^2
+\end{equation}
+
+onde $w_{ij}$ é um indicador binário de atribuição do ponto $i$ ao grupo $j$, e $\boldsymbol{\mu}_j$ é o centroide do grupo $j$.
+
+Métodos baseados em densidade, como HDBSCAN \cite{campello2013density}, oferecem vantagens para dados com grupos de formas irregulares e densidades variáveis, sendo especialmente úteis quando o número de grupos não é conhecido a priori. O HDBSCAN constrói uma hierarquia de grupos baseada em estimativas de densidade, permitindo a identificação automática do número apropriado de grupos.
+
+A integração de aprendizagem profunda com agrupamento tem levado ao desenvolvimento de métodos como Agrupamento Profundo Incorporado (DEC), que realiza simultaneamente a aprendizagem de representações e o agrupamento \cite{xie2016unsupervised}. Esta abordagem supera limitações dos métodos tradicionais em dados de alta dimensionalidade, como é comum em aplicações de análise de jogos.
+
+\section{Metodologia}
+
+\subsection{Conjunto de Dados e Pré-processamento}
+
+O conjunto de dados utilizado neste estudo compreende partidas profissionais de Dota 2 obtidas através da API pública do OpenDota (\url{https://docs.opendota.com}) e bases de dados disponíveis no Kaggle, abrangendo o período de 2013 a 2024. A porção selecionada foi de 2021 a 2024, onde a discrepância de mapa e mudanças é menor e o conjunto está mais refinado. O jogo cresceu significativamente em complexidade, com a adição de novos heróis, itens e mecânicas de jogo. Porém o mais impactante são as mudanças de mapa e heróis, que afetam diretamente a estratégia e o meta do jogo.
+
+As variáveis extraídas para análise incluem:
+\begin{itemize}
+    \item \textbf{Composição de heróis}: Heróis escolhidos e banidos por cada equipe
+    \item \textbf{Características de heróis}: Categoria, atributos principais, papel
+    \item \textbf{Métricas econômicas}: Ouro Por Minuto (GPM), Experiência Por Minuto (XPM), valor líquido final
+    \item \textbf{Desempenho individual}: Proporção Abates/Mortes/Assistências (KDA), dano causado, dano em estrutura, cura realizada
+    \item \textbf{Controle de visão}: Uso de sentinelas observadoras, sentinelas sensitivas
+    \item \textbf{Objetivos estratégicos}: Torres destruídas, abates do Roshan
+    \item \textbf{Duração }: Tempo total de partida
+\end{itemize}
+
+O pré-processamento dos dados seguiu várias etapas críticas. Primeiro, foi realizada limpeza para remoção de partidas incompletas ou com dados inconsistentes. Em seguida, variáveis categóricas como heróis e itens foram convertidas utilizando codificação binária (one-hot), resultando em vetores esparsos de alta dimensionalidade. Para variáveis numéricas, aplicou-se normalização z-escore para garantir que diferentes escalas não introduzissem viés no processo de agrupamento.
+
+Uma contribuição metodológica importante foi o desenvolvimento de um sistema de codificação para capturar interações entre heróis, reconhecendo que certas combinações têm sinergias específicas que não são capturadas por análise individual. Esta codificação preserva informações sobre seleções completas, incluindo ordem de escolhas e banimentos, que são estrategicamente relevantes em jogos profissionais.
+
+\subsection{Arquitetura do Autoencoder}
+
+A arquitetura do autoencoder foi projetada especificamente para lidar com a natureza esparsa e de alta dimensionalidade dos dados de Dota 2. O codificador consiste em múltiplas camadas densamente conectadas com ativação ReLU, progressivamente reduzindo a dimensionalidade:
+
+\begin{itemize}
+    \item Camada de entrada: dimensão original dos dados ($\sim$2000 características)
+    \item Camada oculta 1: 1024 neurônios + Abandono (0.2)
+    \item Camada oculta 2: 512 neurônios + Abandono (0.2)
+    \item Camada latente: 128 neurônios (representação comprimida)
+\end{itemize}
+
+O decodificador espelha esta arquitetura, reconstruindo gradualmente os dados originais. A função de perda combina erro de reconstrução quadrático com regularização L2 para prevenir overfitting:
+
+\begin{equation}
+\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{reconstruction}} + \lambda\|\theta\|^2
+\end{equation}
+
+onde $\lambda$ é o coeficiente de regularização ajustado através de validação cruzada.
+
+\subsection{Agrupamento Profundo Incorporado (DEC)}
+
+O método DEC foi escolhido por sua capacidade de integrar o processo de agrupamento ao treinamento do autoencoder, otimizando simultaneamente a qualidade da representação latente e a coesão dos grupos \cite{xie2016unsupervised}. O algoritmo DEC opera em duas fases principais:
+
+\textbf{Fase 1 - Pré-treinamento}: O autoencoder é treinado independentemente para aprender uma boa representação dos dados, minimizando apenas a função de reconstrução. Esta fase é crucial para inicializar o espaço latente com características significativas.
+
+\textbf{Fase 2 - Refinamento conjunto}: O agrupamento é integrado ao processo de treinamento através de uma distribuição alvo auxiliar. Para cada ponto de dado $\mathbf{x}_i$ na representação latente, calcula-se a probabilidade de pertencer ao grupo $j$ usando uma distribuição t-Student:
+
+\begin{equation}
+q_{ij} = \frac{(1 + \|\mathbf{z}_i - \boldsymbol{\mu}_j\|^2/\alpha)^{-(\alpha+1)/2}}{\sum_{j'}(1 + \|\mathbf{z}_i - \boldsymbol{\mu}_{j'}\|^2/\alpha)^{-(\alpha+1)/2}}
+\end{equation}
+
+onde $\mathbf{z}_i = f_\theta(\mathbf{x}_i)$ é a representação latente, $\boldsymbol{\mu}_j$ são os centroides dos grupos, e $\alpha$ são os graus de liberdade (configurado para $\alpha=1$).
+
+A distribuição alvo $P$ é computada para enfatizar predições de alta confiança:
+
+\begin{equation}
+p_{ij} = \frac{q_{ij}^2/f_j}{\sum_{j'}(q_{ij'}^2/f_{j'})}
+\end{equation}
+
+onde $f_j = \sum_i q_{ij}$ são as frequências dos grupos. O objetivo de agrupamento é minimizar a divergência KL entre $Q$ e $P$:
+
+\begin{equation}
+\mathcal{L}_{\KL} = \KL(P||Q) = \sum_i \sum_j p_{ij} \log\frac{p_{ij}}{q_{ij}}
+\end{equation}
+
+\section{Experimentos e Resultados}
+
+\subsection{Hipóteses de Avaliação}
+
+\subsection{Métricas de Avaliação}
+
+A avaliação da qualidade do agrupamento foi realizada usando múltiplas métricas complementares:
+
+\begin{itemize}
+    \item \textbf{Índice de Silhueta}: Mede a coesão intra-grupo versus separação inter-grupo
+    \item \textbf{Índice de Calinski-Harabasz}: Avalia a razão entre dispersão inter-grupo e intra-grupo
+    \item \textbf{Índice de Davies-Bouldin}: Quantifica a similaridade média entre grupos
+    \item \textbf{Índice Rand Ajustado (ARI)}: Compara grupos descobertos com verdade fundamental quando disponível
+\end{itemize}
+
+Para validação, utilizou-se uma abordagem de separação temporal, onde partidas mais recentes foram reservadas para teste, simulando um cenário realístico de predição. Adicionalmente, análise qualitativa foi conduzida por especialistas em Dota 2 para avaliar a coerência estratégica dos grupos formados.
+
+\subsection{Validação dos Resultados}
+
+\section{Conclusão e Trabalhos Futuros}
+
+\subsection{Dimensionalidade}
+
+\subsection{Resultados Obtidos}
+
+\subsection{Trabalhos Futuros}
 
 % Figure and table captions should be centered if less than one line
 % (Figure~\ref{fig:exampleFig1}), otherwise justified and indented by 0.8cm on
@@ -80,16 +222,6 @@ A solução proposta envolve a extração de características relevantes das par
 % \label{tab:exTable1}
 % \includegraphics[width=.7\textwidth]{table.jpg}
 % \end{table}
-
-\section{References}
-
-Bibliographic references must be unambiguous and uniform.  We recommend giving
-the author names references in brackets, e.g. \cite{knuth:84},
-\cite{boulic:91}, and \cite{smith:99}.
-
-The references must be listed using 12 point font size, with 6 points of space
-before each reference. The first line of each reference should not be
-indented, while the subsequent should be indented by 0.5 cm.
 
 \bibliographystyle{sbc}
 \bibliography{artigo}
