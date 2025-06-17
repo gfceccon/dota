@@ -12,13 +12,7 @@ if __name__ == "__main__":
 
     
     if args.year:
-        print(f"Processando ano {args.year}...")
         df = Dataset().save_dataset(args.year)
-        print("Dados salvos com sucesso!")
-        print("Exibindo as primeiras linhas do DataFrame:")
-        print(df.head())
-        print("Formato do DataFrame:")
-        print(df.shape)
 
     else:
         print("Nenhum ano especificado.")

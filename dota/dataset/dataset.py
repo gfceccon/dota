@@ -391,22 +391,21 @@ class Dataset:
         val_df = df.sample(fraction=0.15, seed=42, shuffle=True)
         test_df = df.sample(fraction=0.15, seed=42, shuffle=True)
 
-        train_df.write_json(f"{path}/train_pl.json",)
-        val_df.write_json(f"{path}/val_pl.json", )
-        test_df.write_json(f"{path}/test_pl.json", )
+        train_pd = train_df.to_pandas()
+        val_pd = val_df.to_pandas()
+        test_pd = test_df.to_pandas()
 
-        train_df.to_pandas().to_csv(f"{path}/train.csv", index=False)
-        val_df.to_pandas().to_csv(f"{path}/val.csv", index=False)
-        test_df.to_pandas().to_csv(f"{path}/test.csv", index=False)
+        train_pd.to_json(f"{path}/train.json", orient='records', lines=True)
+        val_pd.to_json(f"{path}/val.json", orient='records', lines=True)
+        test_pd.to_json(f"{path}/test.json", orient='records', lines=True)
 
-        train_df.to_pandas().to_json(f"{path}/train.json", orient='records', lines=True)
-        val_df.to_pandas().to_json(f"{path}/val.json", orient='records', lines=True)
-        test_df.to_pandas().to_json(f"{path}/test.json", orient='records', lines=True)
-
-
+        log.separator()
         log.info(f"Dataset for year {year} saved at {path}/dataset.json")
-        log.info(
-            f"Train, validation and test sets saved at {path}/train.csv, {path}/val.csv, {path}/test.csv")
+        log.info(f"Dataset shape: {df.shape}")
+        log.info(f"Train set saved at {path}/train.csv")
+        log.info(f"Validation set saved at {path}/val.csv")
+        log.info(f"Test set saved at {path}/test.csv")
+        log.separator()
 
         return df
 
@@ -418,17 +417,5 @@ class Dataset:
         if not os.path.exists(_path):
             raise FileNotFoundError(
                 f"Dataset for year {year} not found at {_path}")
-        json = pd.read_json(_path, orient='records')
+        json = pd.read_json(_path, orient='records', lines=True)
         return json
-
-    @staticmethod
-    def load_csv_train(path: str, year: int, chunk_size: int = 64):
-        if not (2021 <= year < 2025):
-            raise ValueError("Year must be between 2021 and 2024")
-        _train = f"{path}/dota2_data/{year}/train.json"
-        _val = f"{path}/dota2_data/{year}/val.json"
-        _test = f"{path}/dota2_data/{year}/test.json"
-        if not os.path.exists(_train) or not os.path.exists(_val) or not os.path.exists(_test):
-            raise FileNotFoundError(
-                f"Dataset for year {year} not found")
-        return pd.read_json(_train, orient='records',)
