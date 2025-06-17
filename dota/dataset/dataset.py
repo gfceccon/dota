@@ -8,12 +8,14 @@ from dota.logger import LogLevel, get_logger
 import dota.dataset.headers as cols
 import dota.dataset.schemas as schema
 import pandas as pd
+import pandas as pd
 
 log = get_logger('dataset', LogLevel.INFO, False)
 
 
 LEAGUES = f"Constants/Constants.Leagues.csv"
 HEROES = f"Constants/Constants.Heroes.csv"
+ITEMS = f"Constants/Constants.ItemIDs.csv"
 ITEMS = f"Constants/Constants.ItemIDs.csv"
 PATCHES = f"Constants/Constants.Patch.csv"
 
@@ -31,7 +33,9 @@ class Dataset:
 
     def __init__(self,
                  duration: tuple[int, int] = (10 * 60, 150 * 60),
+                 duration: tuple[int, int] = (10 * 60, 150 * 60),
                  tier: list[str] = ['professional', 'premium'],
+                 years: tuple[int, int] = (2021, 2025)):
                  years: tuple[int, int] = (2021, 2025)):
         self.data_path = "dota2_data"
         self.dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
@@ -65,6 +69,22 @@ class Dataset:
             "id").collect().to_series().to_list()
         self.dict_hero_index = {hid: i for i, hid in enumerate(self.hero_ids)}
 
+        _all_items = self._get_lf(ITEMS, cols.items)
+        self.items_id = _all_items.select(pl.col("id")).unique().sort(
+            "id").collect().to_series().to_list()
+        self.dict_items_index = {hid: i for i, hid in enumerate(self.items_id)}
+
+        self.heroes = self._heroes()
+        self.patches = self._patches()
+        self.metadata = self._metadata()
+        self.leagues = self._leagues()
+        self.items = self._items()
+
+    def get_data(self) -> pl.LazyFrame:
+        if (self.data is None):
+            raise ValueError(
+                "Dataset is not initialized. Call get_year() or save_dataset() first.")
+        return self.data
         _all_items = self._get_lf(ITEMS, cols.items)
         self.items_id = _all_items.select(pl.col("id")).unique().sort(
             "id").collect().to_series().to_list()
@@ -123,7 +143,10 @@ class Dataset:
         gold_adv = self._gold_adv(year)
         # Dados de team_fights ainda não estão sendo utilizados
         # team_fights = self._team_fights(year)
+        # Dados de team_fights ainda não estão sendo utilizados
+        # team_fights = self._team_fights(year)
 
+        self.data = (
         self.data = (
             metadata
             .join(self.patches, on="patch", how="inner")
@@ -145,6 +168,15 @@ class Dataset:
                     pl.col("hero_idx")).drop_nulls().alias("radiant_bans"),
                 pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
                     pl.col("hero_idx")).drop_nulls().alias("dire_bans"),
+
+                pl.concat_list([
+                    pl.col(f"item_{x}_idx").drop_nulls()
+                    for x in range(0, 6)
+                ]).alias("items"),
+                pl.concat_list([
+                    pl.col(f"backpack_{x}_idx").drop_nulls()
+                    for x in range(0, 3)
+                ]).alias("backpack"),
 
                 pl.concat_list([
                     pl.col(f"item_{x}_idx").drop_nulls()
@@ -189,6 +221,8 @@ class Dataset:
                 ],
             )
         )
+
+        return self.data
 
         return self.data
 
@@ -249,10 +283,23 @@ class Dataset:
             )
             .with_columns(
                 pl.col("roles").replace(self.dict_roles).alias("roles_vector"),
+                pl.col("roles").replace(self.dict_roles).alias("roles_vector"),
                 pl.col("localized_name").alias("hero_name"),
             )
         )
         return heroes
+
+    def _items(self) -> pl.LazyFrame:
+        items = (
+            self._get_lf(ITEMS, cols.items)
+            .with_columns(
+                pl.col("id").cast(pl.Int32).alias("id"),
+                pl.col("id").replace(self.dict_items_index).cast(
+                    pl.Int32).alias("item_id"),
+                pl.col("name"),
+            )
+        )
+        return items
 
     def _items(self) -> pl.LazyFrame:
         items = (
@@ -331,6 +378,12 @@ class Dataset:
                   for x in range(0, 6)],
                 *[pl.col(f"backpack_{x}").replace(self.dict_items_index).alias(
                     f"backpack_{x}_idx") for x in range(0, 3)],
+                  .alias(f"{col}") for col in ["lh_t", "dn_t", "xp_t", "gold_t"]],
+
+                *[pl.col(f"item_{x}").replace(self.dict_items_index).alias(f"item_{x}_idx")
+                  for x in range(0, 6)],
+                *[pl.col(f"backpack_{x}").replace(self.dict_items_index).alias(
+                    f"backpack_{x}_idx") for x in range(0, 3)],
             )
             .join(self._picks_bans(year), on=["match_id", "hero_id"], how="right")
         )
@@ -379,9 +432,12 @@ class Dataset:
         return lf
 
     def save_dataset(self, year: int) -> pl.DataFrame:
+    def save_dataset(self, year: int) -> pl.DataFrame:
         path = f"{self.data_path}/{year}"
         os.makedirs(path, exist_ok=True)
 
+        df = self.get_year(year).collect()
+        with open(f"{path}/dataset_schema.txt", "w") as f:
         df = self.get_year(year).collect()
         with open(f"{path}/dataset_schema.txt", "w") as f:
             f.write(str(df.collect_schema()))
@@ -410,6 +466,7 @@ class Dataset:
         return df
 
     @staticmethod
+    def load_json(path: str, year: int) -> pd.DataFrame:
     def load_json(path: str, year: int) -> pd.DataFrame:
         if not (2021 <= year < 2025):
             raise ValueError("Year must be between 2021 and 2024")

@@ -4,7 +4,11 @@ import torch.nn as nn
 from torch import FloatTensor, Tensor, LongTensor, IntTensor
 import numpy as np
 import pandas as pd
+from torch import FloatTensor, Tensor, LongTensor, IntTensor
+import numpy as np
+import pandas as pd
 import torch
+from dota.logger import get_logger
 from dota.logger import get_logger
 
 
@@ -26,7 +30,24 @@ class Dota2AE(nn.Module):
         batch_size: int,
 
         input_dim: int,
+
+        name: str,
+
+        lr: float,
+        dropout: float,
+        early_stopping: bool,
+
+        epochs: int,
+        patience: int,
+        batch_size: int,
+
+        input_dim: int,
         latent_dim: int,
+        encoder_layers: list[int],
+        decoder_layers: list[int],
+
+        embeddings: list[tuple[int, int]],
+        embeddings_config: dict[str, bool],
         encoder_layers: list[int],
         decoder_layers: list[int],
 
@@ -35,9 +56,11 @@ class Dota2AE(nn.Module):
     ):
         super(Dota2AE, self).__init__()
         self.name = name
+        self.name = name
         # Configura o device para GPU se disponível, caso contrário CPU
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
+        self.to(self.device)
         self.to(self.device)
 
         # Camadas de embedding para heróis, bans e estatísticas
@@ -58,6 +81,8 @@ class Dota2AE(nn.Module):
         self.latent_dim = latent_dim
         self.input_dim = input_dim
         self.learning_rate = lr
+        self.input_dim = input_dim
+        self.learning_rate = lr
         self.dropout = dropout
 
         self.name = f"Dota2AE_{name}"
@@ -67,7 +92,10 @@ class Dota2AE(nn.Module):
         # Inicializa as camadas do modelo
         self.encoder, self.decoder = self.create_ae(
             input_dim, latent_dim, encoder_layers, decoder_layers)
+        self.encoder, self.decoder = self.create_ae(
+            input_dim, latent_dim, encoder_layers, decoder_layers)
 
+        self.optimizer = torch.optim.Adam(self.parameters(), lr)
         self.optimizer = torch.optim.Adam(self.parameters(), lr)
         self.loss = nn.MSELoss()
 
@@ -85,6 +113,13 @@ class Dota2AE(nn.Module):
         self.full_loss_history = []
         self.best_val_loss = float('inf')
 
+    def create_ae(self, input_dim: int, latent_dim, encoder_layers: list[int], decoder_layers: list[int]) -> tuple[nn.Sequential, nn.Sequential]:
+        _layers = []
+        dim = input_dim
+        for _hidden in encoder_layers:
+            _layers.extend([
+                nn.Linear(dim, _hidden, device=self.device),
+                nn.ReLU(),
     def create_ae(self, input_dim: int, latent_dim, encoder_layers: list[int], decoder_layers: list[int]) -> tuple[nn.Sequential, nn.Sequential]:
         _layers = []
         dim = input_dim
@@ -176,10 +211,14 @@ class Dota2AE(nn.Module):
         epochs_no_improve = 0
         best_state = None
         self.train_stopped = self.epochs
+        self.train_stopped = self.epochs
         self.best_val_loss = float('inf')
+        log.info(f"Iniciando treinamento do modelo com {self.epochs} épocas")
         log.info(f"Iniciando treinamento do modelo com {self.epochs} épocas")
         training_log = "Treinamento"
         log.timer_start(training_log)
+        for epoch in range(self.epochs):
+            log.checkpoint(training_log, f"Epoch {epoch + 1}/{self.epochs}")
         for epoch in range(self.epochs):
             log.checkpoint(training_log, f"Epoch {epoch + 1}/{self.epochs}")
             total_loss = 0.0
@@ -212,6 +251,7 @@ class Dota2AE(nn.Module):
                 self.full_loss_history.append(loss.item())
 
                 total_loss += loss.item()
+
 
             self.eval()
             count = 0
@@ -255,6 +295,7 @@ class Dota2AE(nn.Module):
                     self.train_stopped = epoch + 1
                     log.info(f"Early stopping ativado após {epoch+1} épocas.")
                     log.info(
+                        f'Epoch {epoch + 1}/{self.epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                         f'Epoch {epoch + 1}/{self.epochs}, Loss: {avg_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
                     log.timer_end(training_log)
                     break
@@ -312,9 +353,18 @@ class Dota2AE(nn.Module):
 
     def save_model(self):
         path = f"./best/{self.name}.h5"
+    def save_model(self):
+        path = f"./best/{self.name}.h5"
         checkpoint = {
             'model_args': {
                 'name': self.name,
+                'lr': self.learning_rate,
+                'dropout': self.dropout,
+                'early_stopping': self.early_stopping,
+                'epochs': self.epochs,
+                'patience': self.patience,
+                'batch_size': self.batch_size,
+                'input_dim': self.input_dim,
                 'lr': self.learning_rate,
                 'dropout': self.dropout,
                 'early_stopping': self.early_stopping,
@@ -327,10 +377,15 @@ class Dota2AE(nn.Module):
                 'decoder_layers': self.decoder_layers,
                 'embeddings': [(emb.weight.shape[0], emb.weight.shape[1]) for emb in self.embeddings.values()],
                 'embeddings_config': {k: v for k, v in self.embeddings.items()},
+                'encoder_layers': self.encoder_layers,
+                'decoder_layers': self.decoder_layers,
+                'embeddings': [(emb.weight.shape[0], emb.weight.shape[1]) for emb in self.embeddings.values()],
+                'embeddings_config': {k: v for k, v in self.embeddings.items()},
             },
             'state_dict': self.state_dict(),
         }
         torch.save(checkpoint, path)
+        log.info(f"Modelo salvo em {path}")
         log.info(f"Modelo salvo em {path}")
 
     @classmethod
