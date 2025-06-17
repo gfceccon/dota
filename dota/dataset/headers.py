@@ -22,14 +22,33 @@ objectives_type = {
 
 picks_bans = ["is_pick", "hero_id", "team", "match_id", ]
 
-players = [
-    "hero_id", "match_id", "account_id",
+players = ["hero_id", "match_id", "account_id",
+           "obs_placed", "sen_placed",
+           "creeps_stacked", "camps_stacked", "rune_pickups",
+           "firstblood_claimed",
+           "towers_killed", "roshans_killed",
+           "stuns",
+           "gold_t", "lh_t", "dn_t", "xp_t",
+           "item_0", "item_1", "item_2", "item_3", "item_4", "item_5",
+           "backpack_0", "backpack_1", "backpack_2",
+           "item_neutral",
+           "kills", "deaths", "assists",
+           "last_hits", "denies",
+           "gold_per_min", "xp_per_min", "level", "net_worth",
+           "hero_damage", "tower_damage", "hero_healing",
+           "total_gold", "total_xp",
+           "neutral_kills", "tower_kills", "courier_kills",
+           "hero_kills", "observer_kills", "sentry_kills", "roshan_kills",
+           "necronomicon_kills", "ancient_kills", "buyback_count",
+           "purchase_gem", "purchase_rapier", "player_slot"]
+
+players_stats_single = [
+    "hero_id",
     "obs_placed", "sen_placed",
     "creeps_stacked", "camps_stacked", "rune_pickups",
     "firstblood_claimed",
     "towers_killed", "roshans_killed",
     "stuns",
-    "gold_t", "lh_t", "dn_t", "xp_t",
     "item_0", "item_1", "item_2", "item_3", "item_4", "item_5",
     "backpack_0", "backpack_1", "backpack_2",
     "item_neutral",
@@ -41,7 +60,11 @@ players = [
     "neutral_kills", "tower_kills", "courier_kills",
     "hero_kills", "observer_kills", "sentry_kills", "roshan_kills",
     "necronomicon_kills", "ancient_kills", "buyback_count",
-    "purchase_gem", "purchase_rapier",]
+    "purchase_gem", "purchase_rapier"
+]
+players_stats_list = [
+    "gold_t", "lh_t", "dn_t", "xp_t",
+]
 
 exp_adv = ["minute", "exp", "match_id",]
 

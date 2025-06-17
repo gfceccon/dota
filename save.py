@@ -16,5 +16,4 @@ if __name__ == "__main__":
 
     else:
         print("Nenhum ano especificado.")
-        print("Nenhum ano especificado.")
         print("Use o argumento --year para processar dados de um ano específico (2021-2024)")

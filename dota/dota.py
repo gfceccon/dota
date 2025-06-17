@@ -24,13 +24,7 @@ log = get_logger("Dota2", log_file="dota2.log")
 
 class Dota2():
     config = {
-        "creeps_stacked": False,
-        "camps_stacked": False,
-        "rune_pickups": False,
-        "firstblood_claimed": False,
-        "towers_killed": False,
-        "roshans_killed": False,
-        "stuns": False,
+        "item_neutral": True,
         "kills": True,
         "deaths": True,
         "assists": True,
@@ -45,30 +39,38 @@ class Dota2():
         "hero_healing": True,
         "total_gold": True,
         "total_xp": True,
-        "neutral_kills": False,
-        "tower_kills": False,
-        "courier_kills": False,
-        "hero_kills": False,
-        "observer_kills": False,
-        "sentry_kills": False,
-        "roshan_kills": False,
-        "necronomicon_kills": False,
-        "ancient_kills": False,
-        "buyback_count": False,
-        "purchase_gem": False,
-        "purchase_rapier": False,
+        "neutral_kills": True,
+        "tower_kills": True,
+        "courier_kills": True,
+        "hero_kills": True,
+        "observer_kills": True,
+        "sentry_kills": True,
+        "roshan_kills": True,
+        "necronomicon_kills": True,
+        "ancient_kills": True,
+        "buyback_count": True,
+        "purchase_gem": True,
+        "purchase_rapier": True,
     }
 
-    embeddings_config = {
+    emb_config = {
         "radiant_picks": True,
         "dire_picks": True,
         "radiant_bans": True,
         "dire_bans": True,
+
+        "roles_pick": False,
+        "roles_ban": False,
+        "attributes": False,
+        "attack": False,
         "items": False,
         "backpack": False,
-        "item_neutral": False,
-        "roles_vector": False,
-        "primary_attribute": False,
+        "neutral_items": False,
+    }
+
+    columns = {
+        "player_radiant_stats": True,
+        "player_dire_stats": True,
     }
 
     def __init__(self, year: int):
@@ -76,30 +78,45 @@ class Dota2():
         self._dataset = ds
         self.path = f"{ds.data_path}/{year}"
 
-        self.dict_attributes = len(self._dataset.dict_attributes) + 1
-        self.dict_pick = len(self._dataset.dict_hero_index) + 1
-        self.dict_ban = len(self._dataset.dict_hero_index) + 1
-        self.dict_roles = len(self._dataset.dict_roles) + 1
-        self.dict_attributes = len(self._dataset.dict_attributes) + 1
-        self.dict_items = len(self._dataset.items_id) + 1
+        self.dict_attributes = len(ds.dict_attributes) + 1
+        self.dict_pick = len(ds.dict_hero_index) + 1
+        self.dict_ban = len(ds.dict_hero_index) + 1
+        self.dict_roles = len(ds.dict_roles) + 1
+        self.dict_items = len(ds.items_id) + 1
 
-        self.emb_pick = 16
-        self.emb_ban = 8
+        self.emb_pick = 32
+        self.emb_ban = 32
         self.emb_items = 16
-        self.emb_role = 8
+        self.emb_role = 16
         self.emb_attributes = 8
+        self.emb_neutral = 8
 
-        self.embeddings = [
-            (self.dict_pick, self.emb_pick),
-            (self.dict_pick, self.emb_pick),
-            (self.dict_ban, self.emb_ban),
-            (self.dict_ban, self.emb_ban),
-            (self.dict_items, self.emb_items),
-            (self.dict_items, self.emb_items),
-            (self.dict_items, self.emb_items),
-            (self.dict_roles, self.emb_role),
-            (self.dict_attributes, self.emb_attributes),
-        ]
+        self.embeddings = {
+            "radiant_picks": (self.emb_pick, self.dict_pick),
+            "dire_picks": (self.emb_pick, self.dict_pick),
+            "radiant_bans": (self.emb_ban, self.dict_ban),
+            "dire_bans": (self.emb_ban, self.dict_ban),
+
+
+            "radiant_roles_picks": (self.emb_role, self.dict_roles),
+            "dire_roles_picks": (self.emb_role, self.dict_roles),
+            "radiant_roles_bans": (self.emb_role, self.dict_roles),
+            "dire_roles_bans": (self.emb_role, self.dict_roles),
+
+            "radiant_attributes": (self.emb_attributes, self.dict_attributes),
+            "dire_attributes": (self.emb_attributes, self.dict_attributes),
+            "radiant_attack": (self.emb_attributes, self.dict_attributes),
+            "dire_attack": (self.emb_attributes, self.dict_attributes),
+
+            "radiant_items": (self.emb_items, self.dict_items),
+            "dire_items": (self.emb_items, self.dict_items),
+
+            "radiant_backpack": (self.emb_items, self.dict_items),
+            "dire_backpack": (self.emb_items, self.dict_items),
+
+            "radiant_neutral_items": (self.emb_neutral, self.dict_items),
+            "dire_neutral_items": (self.emb_neutral, self.dict_items),
+        }
 
         self.dropout = 0.2
         self.batch_size = 64
@@ -122,8 +139,10 @@ class Dota2():
 
         log.separator()
         log.info("Dota2 Initialized",)
-        log.info(f"Configuration: {[k for k in self.config.keys() if self.config[k]]}")
-        log.info(f"Embeddings: {[k for k in self.embeddings_config.keys() if self.embeddings_config[k]]}")
+        log.info(
+            f"Configuration: {[k for k in self.config.keys() if self.config[k]]}")
+        log.info(
+            f"Embeddings: {[k for k in self.emb_config.keys() if self.emb_config[k]]}")
         log.info(f"Input Dimension: {self.input_dim}")
         log.info(f"Latent Dimension: {self.latent_dim}")
         log.info(f"Encoder Layers: {self.encoder_layers}")
@@ -144,7 +163,6 @@ class Dota2():
         log.info(f"Primary Attribute Embedding: {self.emb_attributes}")
         log.separator()
 
-
         self.ae = Dota2AE(
             name="Dota2AE",
             input_dim=self.calc_input_dim(),
@@ -157,34 +175,39 @@ class Dota2():
             epochs=self.epochs,
             patience=self.patience,
             early_stopping=True,
-            embeddings=self.embeddings,
-            embeddings_config=self.embeddings_config,
+            embeddings_config=self.embeddings,
         )
-        self.ae.train_data(f"{self.path}/train.json",
-                           f"{self.path}/val.json", self.config, self.embeddings_config)
+
+        self.ae.train_data(
+            f"{self.path}/train.json",
+            f"{self.path}/val.json",
+            self.columns,
+            "player_radiant_stats",
+            "player_dire_stats",
+            self.emb_config)
         # self.cluster = Dota2Cluster()
 
     def calc_input_dim(self):
-<<<<<<< HEAD
-        dim = 10 * sum([1 if self.config[key] else 0 for key in self.config.keys()])
-        dim += self.emb_pick * self.n_players if self.embeddings_config['radiant_picks'] else 0
-        dim += self.emb_pick * self.n_players if self.embeddings_config['dire_picks'] else 0
-        dim += self.emb_ban * self.n_bans if self.embeddings_config['radiant_bans'] else 0
-        dim += self.emb_ban * self.n_bans if self.embeddings_config['dire_bans'] else 0
-        dim += self.emb_items * self.n_items if self.embeddings_config['items'] else 0
-        dim += self.emb_items * self.n_backpack if self.embeddings_config['backpack'] else 0
-        dim += self.emb_items * self.n_neutral if self.embeddings_config['item_neutral'] else 0
-        dim += self.emb_role * self.dict_roles if self.embeddings_config['roles_vector'] else 0
-        dim += self.emb_attributes * self.dict_attributes if self.embeddings_config['roles_vector'] else 0
-=======
-        dim = 10 * sum([1 if self.config[key] else 0 for key in self.config])
-        dim += self.emb_pick * 5 if self.embeddings_config['radiant_picks'] else 0
-        dim += self.emb_pick * 5 if self.embeddings_config['dire_picks'] else 0
-        dim += self.emb_ban * 7 if self.embeddings_config['radiant_bans'] else 0
-        dim += self.emb_ban * 7 if self.embeddings_config['dire_bans'] else 0
-        dim += self.emb_items * 6 if self.embeddings_config['items'] else 0
-        dim += self.emb_items * 3 if self.embeddings_config['backpack'] else 0
-        dim += self.emb_items * 1 if self.embeddings_config['item_neutral'] else 0
-        dim += self.emb_role * 8 if self.embeddings_config['roles_vector'] else 0
->>>>>>> 4b6bdae (zzz)
+        dim = (
+            2 * self.n_players *
+            sum([1 if self.config[key] else 0
+                 for key in self.config.keys()]))
+
+        dim += self.emb_pick * 2 * self.n_players
+        dim += self.emb_ban * 2 * self.n_bans
+
+        if(self.emb_config["roles_pick"]):
+            dim += self.emb_role * 2 * self.n_players
+        if(self.emb_config["roles_ban"]):
+            dim += self.emb_role * 2 * self.n_bans
+        if(self.emb_config["attributes"]):
+            dim += self.emb_attributes * 2 * self.n_players
+        if(self.emb_config["attack"]):
+            dim += self.emb_attributes * 2 * self.n_players
+        if(self.emb_config["items"]):
+            dim += self.emb_items * 2 * self.n_players
+        if(self.emb_config["backpack"]):
+            dim += self.emb_items * 2 * self.n_players
+        if(self.emb_config["neutral_items"]):
+            dim += self.emb_neutral * 2 * self.n_players
         return dim

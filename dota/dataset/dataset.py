@@ -33,13 +33,16 @@ class Dataset:
 
     def __init__(self,
                  duration: tuple[int, int] = (10 * 60, 150 * 60),
-                 duration: tuple[int, int] = (10 * 60, 150 * 60),
                  tier: list[str] = ['professional', 'premium'],
-                 years: tuple[int, int] = (2021, 2025)):
                  years: tuple[int, int] = (2021, 2025)):
         self.data_path = "dota2_data"
         self.dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
-        self.path = kagglehub.dataset_download(self.dataset_name)
+        
+        self.dataset_version = "181"
+        self.path = f"~/.cache/kagglehub/datasets/{self.dataset_name}/versions/{self.dataset_version}/"
+        if(not os.path.exists(self.path)):
+            self.path = kagglehub.dataset_download(self.dataset_name)
+            print(f"Dataset downloaded to {self.path}")
 
         self.years = years
         self.duration = duration
@@ -50,8 +53,13 @@ class Dataset:
             _all_heroes.select(pl.col("primary_attr")).unique()
             .collect().to_dict(as_series=False)["primary_attr"]
         )
-        self.dict_attributes = {attr: i for i,
+        self.dict_attributes = {attr: i + 1 for i,
                                 attr in enumerate(self.attributes)}
+        self.dict_attack = {
+            "Melee": 1,
+            "Ranged": 2,
+            "Unknown": 0
+        }
 
         self.roles: list[str] = list({
             role for roles_list in
@@ -62,8 +70,7 @@ class Dataset:
                 if isinstance(roles_list, str) else roles_list)
         })
 
-        self.dict_roles = {role: i for i, role in enumerate(self.roles)}
-        self.roles_idx = [i for i in self.dict_roles.values()]
+        self.dict_roles = {role: i + 1 for i, role in enumerate(self.roles)}
 
         self.hero_ids = _all_heroes.select(pl.col("id")).unique().sort(
             "id").collect().to_series().to_list()
@@ -72,7 +79,8 @@ class Dataset:
         _all_items = self._get_lf(ITEMS, cols.items)
         self.items_id = _all_items.select(pl.col("id")).unique().sort(
             "id").collect().to_series().to_list()
-        self.dict_items_index = {hid: i for i, hid in enumerate(self.items_id)}
+        self.dict_items_index = {hid: i + 1 for i,
+                                 hid in enumerate(self.items_id)}
 
         self.heroes = self._heroes()
         self.patches = self._patches()
@@ -80,27 +88,10 @@ class Dataset:
         self.leagues = self._leagues()
         self.items = self._items()
 
-    def get_data(self) -> pl.LazyFrame:
-        if (self.data is None):
-            raise ValueError(
-                "Dataset is not initialized. Call get_year() or save_dataset() first.")
-        return self.data
         _all_items = self._get_lf(ITEMS, cols.items)
         self.items_id = _all_items.select(pl.col("id")).unique().sort(
             "id").collect().to_series().to_list()
         self.dict_items_index = {hid: i for i, hid in enumerate(self.items_id)}
-
-        self.heroes = self._heroes()
-        self.patches = self._patches()
-        self.metadata = self._metadata()
-        self.leagues = self._leagues()
-        self.items = self._items()
-
-    def get_data(self) -> pl.LazyFrame:
-        if (self.data is None):
-            raise ValueError(
-                "Dataset is not initialized. Call get_year() or save_dataset() first.")
-        return self.data
 
     def get_heroes_usage(self, year: int) -> pl.LazyFrame:
         picks_bans = self._picks_bans(year).with_columns(
@@ -143,49 +134,96 @@ class Dataset:
         gold_adv = self._gold_adv(year)
         # Dados de team_fights ainda não estão sendo utilizados
         # team_fights = self._team_fights(year)
-        # Dados de team_fights ainda não estão sendo utilizados
-        # team_fights = self._team_fights(year)
 
-        self.data = (
         self.data = (
             metadata
             .join(self.patches, on="patch", how="inner")
             .join(self.leagues, on="leagueid", how="inner")
             .join(games, on=["match_id"], how="inner")
             .join(self.heroes, on="hero_id", how="inner")
-            .group_by("match_id")
+            .with_columns(
+                # Players Stats
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True))
+                .then(
+                    pl.concat_list(
+                        pl.when(pl.col(x).is_not_null())
+                        .then(pl.col(x))
+                        .otherwise(pl.lit(0))
+                        for x in cols.players_stats_single
+                    ).alias("player_radiant_stats")
+                ),
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True))
+                .then(
+                    pl.concat_list(
+                        pl.when(pl.col(x).is_not_null())
+                        .then(pl.col(x))
+                        .otherwise(pl.lit(0))
+                        for x in cols.players_stats_single
+                    ).alias("player_dire_stats")
+                ),
+
+                # Items
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
+                    pl.col("items_vector")).alias("radiant_items"),
+
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
+                    pl.col("items_vector")).alias("dire_items"),
+
+                # Backpack
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
+                    pl.col("backpack_vector")).alias("radiant_backpack"),
+
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
+                    pl.col("backpack_vector")).alias("dire_backpack"),
+            )
+            .group_by(["match_id"])
             .agg([
                 pl.all().exclude(*["count", *cols.patches, *
                                    cols.leagues, *cols.heroes, *cols.metadata]),
+
                 *[pl.col(_col).first() for _col in
                   set(col for col in [*cols.patches, *cols.leagues, *cols.metadata] if col not in ["match_id",])],
+
+                # Picks and Bans
                 pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
                     pl.col("hero_idx")).drop_nulls().alias("radiant_picks"),
+
                 pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
                     pl.col("hero_idx")).drop_nulls().alias("dire_picks"),
 
                 pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
                     pl.col("hero_idx")).drop_nulls().alias("radiant_bans"),
+
                 pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
                     pl.col("hero_idx")).drop_nulls().alias("dire_bans"),
 
-                pl.concat_list([
-                    pl.col(f"item_{x}_idx").drop_nulls()
-                    for x in range(0, 6)
-                ]).alias("items"),
-                pl.concat_list([
-                    pl.col(f"backpack_{x}_idx").drop_nulls()
-                    for x in range(0, 3)
-                ]).alias("backpack"),
+                # Hero Attributes
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
+                    pl.col("primary_attribute")).alias("radiant_attributes"),
 
-                pl.concat_list([
-                    pl.col(f"item_{x}_idx").drop_nulls()
-                    for x in range(0, 6)
-                ]).alias("items"),
-                pl.concat_list([
-                    pl.col(f"backpack_{x}_idx").drop_nulls()
-                    for x in range(0, 3)
-                ]).alias("backpack"),
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
+                    pl.col("primary_attribute")).alias("dire_attributes"),
+
+                # Hero Attack type
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
+                    pl.col("attack")).alias("radiant_attack"),
+
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
+                    pl.col("attack")).alias("dire_attack"),
+
+                # Hero Roles
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
+                    pl.col("roles_vector")).alias("radiant_roles_picks"),
+
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
+                    pl.col("roles_vector")).alias("dire_roles_picks"),
+
+                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
+                    pl.col("roles_vector")).alias("radiant_roles_bans"),
+
+                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
+                    pl.col("roles_vector")).alias("dire_roles_bans"),
+
             ])
             .join(objectives, on="match_id", how="inner")
             .join(exp_adv, on="match_id", how="inner")
@@ -221,8 +259,6 @@ class Dataset:
                 ],
             )
         )
-
-        return self.data
 
         return self.data
 
@@ -262,44 +298,42 @@ class Dataset:
         heroes = (
             self._get_lf(HEROES, cols.heroes)
             .with_columns(
-                pl.col("primary_attr").map_elements(lambda x: self.dict_attributes.get(x) if isinstance(
-                    x, str) else x, return_dtype=pl.Int32).alias("primary_attribute"),
+                pl.col("primary_attr")
+                .replace(self.dict_attributes,
+                         return_dtype=pl.Int32).alias("primary_attribute"),
                 pl.col("roles").map_elements(
                     lambda x: [
                         self.dict_roles.get(y) for y in ast.literal_eval(x)]
-                        if isinstance(x, str) else x,
+                    if isinstance(x, str) else x,
                     return_dtype=pl.List(pl.Int32)
-                ),
-                pl.col("attack_type").map_elements(
-                    lambda x: 0 if x == "Melee" else 1 if x == "Ranged" else -1, return_dtype=pl.Int32
-                ).alias("attack_type"),
+                ).replace(self.dict_roles).alias("roles_vector"),
                 pl.col("id")
                 .cast(pl.Int32)
                 .alias("hero_id"),
+
                 pl.col("id")
-                .replace(self.dict_hero_index)
-                .cast(pl.Int32)
+                .replace(self.dict_hero_index, return_dtype=pl.Int32)
                 .alias("hero_idx"),
-            )
-            .with_columns(
-                pl.col("roles").replace(self.dict_roles).alias("roles_vector"),
-                pl.col("roles").replace(self.dict_roles).alias("roles_vector"),
+
+                pl.col("attack_type")
+                .replace(self.dict_attack,
+                         return_dtype=pl.Int32).alias("attack"),
+
                 pl.col("localized_name").alias("hero_name"),
             )
         )
-        return heroes
 
-    def _items(self) -> pl.LazyFrame:
-        items = (
-            self._get_lf(ITEMS, cols.items)
-            .with_columns(
-                pl.col("id").cast(pl.Int32).alias("id"),
-                pl.col("id").replace(self.dict_items_index).cast(
-                    pl.Int32).alias("item_id"),
-                pl.col("name"),
-            )
-        )
-        return items
+        size_roles = len(self.dict_roles)
+        _heroes = heroes.collect()
+        rows = []
+        for h in _heroes.iter_rows(named=True):
+            l = len(h["roles_vector"])
+            h["roles_vector"] = sorted(
+                h["roles_vector"] + [0] * (size_roles - l))
+            rows.append(h)
+        new_heroes = pl.DataFrame(rows, schema=_heroes.schema)
+
+        return new_heroes.lazy()
 
     def _items(self) -> pl.LazyFrame:
         items = (
@@ -354,9 +388,9 @@ class Dataset:
 
         players = (
             players
-            .select(cols.players)
             .with_columns(
                 pl.col("hero_id").cast(pl.Int32).alias("hero_id"),
+                pl.col("account_id").cast(pl.Int32).alias("account_id"),
 
                 pl.when(pl.col("purchase_gem") == "")
                 .then(pl.lit(0))
@@ -369,21 +403,28 @@ class Dataset:
                 .otherwise(pl.col("purchase_rapier").str.to_decimal())
                 .cast(pl.Int32)
                 .alias("purchase_rapier"),
+
                 *[pl.col({col}).str
                   .extract_all(r"(\d+)")
                   .list.eval(pl.element().cast(pl.Int32))
-                  .alias(f"{col}") for col in ["lh_t", "dn_t", "xp_t", "gold_t"]],
+                  .alias(f"{col}") for col in cols.players_stats_list],
 
                 *[pl.col(f"item_{x}").replace(self.dict_items_index).alias(f"item_{x}_idx")
                   for x in range(0, 6)],
-                *[pl.col(f"backpack_{x}").replace(self.dict_items_index).alias(
-                    f"backpack_{x}_idx") for x in range(0, 3)],
-                  .alias(f"{col}") for col in ["lh_t", "dn_t", "xp_t", "gold_t"]],
 
-                *[pl.col(f"item_{x}").replace(self.dict_items_index).alias(f"item_{x}_idx")
-                  for x in range(0, 6)],
                 *[pl.col(f"backpack_{x}").replace(self.dict_items_index).alias(
                     f"backpack_{x}_idx") for x in range(0, 3)],
+            )
+            .with_columns(
+                pl.concat([
+                    pl.col(f"item_{x}_idx")
+                    for x in range(0, 6)
+                ]).alias("items_vector"),
+
+                pl.concat([
+                    pl.col(f"backpack_{x}_idx")
+                    for x in range(0, 3)
+                ]).alias("backpack_vector"),
             )
             .join(self._picks_bans(year), on=["match_id", "hero_id"], how="right")
         )
@@ -432,20 +473,22 @@ class Dataset:
         return lf
 
     def save_dataset(self, year: int) -> pl.DataFrame:
-    def save_dataset(self, year: int) -> pl.DataFrame:
         path = f"{self.data_path}/{year}"
         os.makedirs(path, exist_ok=True)
 
         df = self.get_year(year).collect()
-        with open(f"{path}/dataset_schema.txt", "w") as f:
-        df = self.get_year(year).collect()
+        ti = df.filter(pl.col("leaguename").str.starts_with(
+            f"The International {year}"))
         with open(f"{path}/dataset_schema.txt", "w") as f:
             f.write(str(df.collect_schema()))
         df.write_json(f"{path}/dataset.json")
+        ti.write_json(f"{path}/ti.json")
 
-        train_df = df.sample(fraction=0.7, seed=42, shuffle=True)
-        val_df = df.sample(fraction=0.15, seed=42, shuffle=True)
-        test_df = df.sample(fraction=0.15, seed=42, shuffle=True)
+        df = df.sample(fraction=1, seed=42, shuffle=True,
+                       with_replacement=True)  # Shuffle the DataFrame
+        train_df = df.sample(fraction=0.7, seed=42)
+        val_df = df.sample(fraction=0.15, seed=42)
+        test_df = df.sample(fraction=0.15, seed=42)
 
         train_pd = train_df.to_pandas()
         val_pd = val_df.to_pandas()
@@ -466,7 +509,6 @@ class Dataset:
         return df
 
     @staticmethod
-    def load_json(path: str, year: int) -> pd.DataFrame:
     def load_json(path: str, year: int) -> pd.DataFrame:
         if not (2021 <= year < 2025):
             raise ValueError("Year must be between 2021 and 2024")
