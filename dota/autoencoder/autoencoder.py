@@ -73,10 +73,13 @@ class Dota2AE(nn.Module):
         self.decoder_layers = decoder_layers
         self.embeddings_config = embeddings_config
 
+<<<<<<< HEAD
         self.encoder_layers = encoder_layers
         self.decoder_layers = decoder_layers
         self.embeddings_config = embeddings_config
 
+=======
+>>>>>>> 4b6bdae (zzz)
         # Dimensões e hiperparâmetros do modelo
         self.latent_dim = latent_dim
         self.input_dim = input_dim
@@ -104,7 +107,10 @@ class Dota2AE(nn.Module):
         self.batch_size = batch_size
         self.early_stopping = early_stopping
         self.mse = nn.MSELoss(reduction='mean')
+<<<<<<< HEAD
         self.mse = nn.MSELoss(reduction='mean')
+=======
+>>>>>>> 4b6bdae (zzz)
 
         # Históricos de loss
         self.train_stopped = 0
@@ -161,11 +167,15 @@ class Dota2AE(nn.Module):
 
     def encode(self, data: np.ndarray[Any, Any]) -> tuple[torch.Tensor, torch.Tensor]:
         tensor = torch.tensor(data, device=self.device, dtype=torch.float32)
+<<<<<<< HEAD
         tensor = torch.tensor(data, device=self.device, dtype=torch.float32)
+=======
+>>>>>>> 4b6bdae (zzz)
         latent, reconstructed = self.forward(tensor)
         return latent, reconstructed
 
     def pad_sequences(self, sequences, dtype, value=0):
+<<<<<<< HEAD
         max_len = max(len(seq) for seq in sequences)
         return np.array([
             np.pad(seq, (0, max_len - len(seq)),
@@ -206,6 +216,17 @@ class Dota2AE(nn.Module):
         data = torch.cat(tensor_array, dim=1).to(self.device)
         return data
 
+=======
+        """
+        Faz padding em uma lista de arrays/listas para que todos tenham o mesmo tamanho.
+        """
+        max_len = max(len(seq) for seq in sequences)
+        return np.array([
+            np.pad(seq, (0, max_len - len(seq)),
+                    mode='constant', constant_values=value)
+            for seq in sequences
+        ], dtype=dtype)
+>>>>>>> 4b6bdae (zzz)
     def train_data(self, training_df_path: str, validation_df_path: str, columns: dict[str, bool], emb_columns: dict[str, bool]) -> None:
 
         epochs_no_improve = 0
@@ -225,6 +246,7 @@ class Dota2AE(nn.Module):
             total_val_loss = 0.0
 
             self.train()
+<<<<<<< HEAD
             for _data in pd.read_json(training_df_path, orient='records', lines=True, chunksize=self.batch_size, engine='pyarrow'):
                 batch_data = cast(pd.DataFrame, _data)
                 batch_size = len(batch_data)
@@ -243,6 +265,37 @@ class Dota2AE(nn.Module):
 
                 log.debug(f"Dimensão total de entrada: {input_sum}")
 
+=======
+            for _data in pd.read_json(training_df_path, orient='records', lines=True, chunksize=self.batch_size):
+                _data = cast(pd.DataFrame, _data)
+                tensor_array = []
+                batch_size = len(_data)
+
+                for col in columns:
+                    if columns[col]:
+                        # Tensor shape: [batch_size, sequence_length]
+                        tensor = torch.tensor(self.pad_sequences(
+                            _data[col].values, dtype=np.float32), device=self.device)
+                        # Flatten para garantir um vetor por amostra
+                        tensor = tensor.view(batch_size, -1)
+                        tensor_array.append(tensor)
+
+                for col in emb_columns:
+                    embed = self.embeddings[col]
+                    if isinstance(embed, nn.Embedding) and emb_columns[col]:
+                        # Tensor shape: [batch_size, sequence_length]
+                        ids = torch.tensor(self.pad_sequences(
+                            _data[col].values, dtype=np.int32), device=self.device)
+                        # Embedding shape: [batch_size, sequence_length, embedding_dim]
+                        embedded = embed(ids)
+                        # Reshape para [batch_size, sequence_length * embedding_dim]
+                        embedded = embedded.view(batch_size, -1)
+                        tensor_array.append(embedded)
+
+                # Concatenar todos os tensores ao longo da dimensão 1 (colunas)
+                data = torch.cat(tensor_array, dim=1).to(self.device)
+
+>>>>>>> 4b6bdae (zzz)
                 self.optimizer.zero_grad()
                 latent, reconstructed = self.forward(data)
                 loss = self.loss(data, reconstructed)
@@ -258,6 +311,7 @@ class Dota2AE(nn.Module):
             log.info(
                 f"Validando modelo após {epoch + 1} épocas de treinamento")
             with torch.no_grad():
+<<<<<<< HEAD
                 for val_batch_data in pd.read_json(validation_df_path, orient='records', lines=True, chunksize=self.batch_size):
 
                     val_data = cast(pd.DataFrame, val_batch_data)
@@ -265,6 +319,33 @@ class Dota2AE(nn.Module):
 
                     val_data = self.flatten_tensor(
                         val_data, val_batch_size, columns, emb_columns)
+=======
+                for batch_eval in pd.read_json(validation_df_path, orient='records', lines=True, chunksize=self.batch_size):
+                    batch_eval = cast(pd.DataFrame, batch_eval)
+                    tensor_array = []
+                    batch_size = len(batch_eval)
+
+                    # Processar colunas numéricas
+                    for col in columns:
+                        if columns[col]:
+                            tensor = torch.tensor(self.pad_sequences(
+                                batch_eval[col].values, dtype=np.float32), device=self.device)
+                            tensor = tensor.view(batch_size, -1)
+                            tensor_array.append(tensor)
+
+                    # Processar embeddings
+                    for col in emb_columns:
+                        embed = self.embeddings[col]
+                        if isinstance(embed, nn.Embedding) and emb_columns[col]:
+                            ids = torch.tensor(self.pad_sequences(
+                                batch_eval[col].values, dtype=np.int32), device=self.device)
+                            embedded = embed(ids)
+                            embedded = embedded.view(batch_size, -1)
+                            tensor_array.append(embedded)
+
+                    # Concatenar os tensores
+                    val_data = torch.cat(tensor_array, dim=1).to(self.device)
+>>>>>>> 4b6bdae (zzz)
 
                     # Passar pelo modelo
                     _, reconstructed = self.forward(val_data)
@@ -328,6 +409,31 @@ class Dota2AE(nn.Module):
     #                         batch[col].values, dtype=np.float32), device=self.device)
     #                     tensor = tensor.view(batch_size, -1)
     #                     tensor_array.append(tensor)
+<<<<<<< HEAD
+=======
+
+    #             # Processar embeddings
+    #             for col in emb_columns:
+    #                 embed = self.embeddings[col]
+    #                 if isinstance(embed, nn.Embedding) and emb_columns[col]:
+    #                     ids = torch.tensor(self.pad_sequences(
+    #                         _data[col].values, dtype=np.int32), device=self.device)
+    #                     embedded = embed(ids)
+    #                     embedded = embedded.view(batch_size, -1)
+    #                     tensor_array.append(embedded)
+
+    #             mse = self.loss(original, reconstructed).item()
+    #             # Concatenar os tensores
+    #             val_data = torch.cat(tensor_array, dim=1).to(self.device)
+    #             min_mse = min(min_mse, self.mse)
+    #             max_mse = max(max_mse, self.mse)
+    #             if mse < threshold:
+    #                 correct += 1
+    #             total += 1
+    #     accuracy = correct / total if total > 0 else 1
+    #     avg_mse = total_mse / total if total > 0 else 1
+    #     return accuracy, avg_mse, min_mse, max_mse
+>>>>>>> 4b6bdae (zzz)
 
     #             # Processar embeddings
     #             for col in emb_columns:

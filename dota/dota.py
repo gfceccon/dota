@@ -165,6 +165,7 @@ class Dota2():
         # self.cluster = Dota2Cluster()
 
     def calc_input_dim(self):
+<<<<<<< HEAD
         dim = 10 * sum([1 if self.config[key] else 0 for key in self.config.keys()])
         dim += self.emb_pick * self.n_players if self.embeddings_config['radiant_picks'] else 0
         dim += self.emb_pick * self.n_players if self.embeddings_config['dire_picks'] else 0
@@ -175,4 +176,15 @@ class Dota2():
         dim += self.emb_items * self.n_neutral if self.embeddings_config['item_neutral'] else 0
         dim += self.emb_role * self.dict_roles if self.embeddings_config['roles_vector'] else 0
         dim += self.emb_attributes * self.dict_attributes if self.embeddings_config['roles_vector'] else 0
+=======
+        dim = 10 * sum([1 if self.config[key] else 0 for key in self.config])
+        dim += self.emb_pick * 5 if self.embeddings_config['radiant_picks'] else 0
+        dim += self.emb_pick * 5 if self.embeddings_config['dire_picks'] else 0
+        dim += self.emb_ban * 7 if self.embeddings_config['radiant_bans'] else 0
+        dim += self.emb_ban * 7 if self.embeddings_config['dire_bans'] else 0
+        dim += self.emb_items * 6 if self.embeddings_config['items'] else 0
+        dim += self.emb_items * 3 if self.embeddings_config['backpack'] else 0
+        dim += self.emb_items * 1 if self.embeddings_config['item_neutral'] else 0
+        dim += self.emb_role * 8 if self.embeddings_config['roles_vector'] else 0
+>>>>>>> 4b6bdae (zzz)
         return dim
