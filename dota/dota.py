@@ -126,21 +126,12 @@ class Dota2():
 
     def calc_input_dim(self):
         dim = 10 * sum([1 if self.config[key] else 0 for key in self.config])
-        dim += self.emb_pick if self.embeddings_config['radiant_picks'] else 0
-        dim += self.emb_pick if self.embeddings_config['dire_picks'] else 0
-        dim += self.emb_ban if self.embeddings_config['radiant_bans'] else 0
-        dim += self.emb_ban if self.embeddings_config['dire_bans'] else 0
-        dim += self.emb_items if self.embeddings_config['items'] else 0
-        dim += self.emb_items if self.embeddings_config['backpack'] else 0
-        dim += self.emb_items if self.embeddings_config['item_neutral'] else 0
-        dim += self.emb_role if self.embeddings_config['roles_vector'] else 0
+        dim += self.emb_pick * 5 if self.embeddings_config['radiant_picks'] else 0
+        dim += self.emb_pick * 5 if self.embeddings_config['dire_picks'] else 0
+        dim += self.emb_ban * 7 if self.embeddings_config['radiant_bans'] else 0
+        dim += self.emb_ban * 7 if self.embeddings_config['dire_bans'] else 0
+        dim += self.emb_items * 6 if self.embeddings_config['items'] else 0
+        dim += self.emb_items * 3 if self.embeddings_config['backpack'] else 0
+        dim += self.emb_items * 1 if self.embeddings_config['item_neutral'] else 0
+        dim += self.emb_role * 8 if self.embeddings_config['roles_vector'] else 0
         return dim
-
-    def ae_create(self):
-        ...
-
-    def ae_train(self):
-        ...
-
-    def ae_predict_ti(self, year: int):
-        ...

@@ -158,6 +158,13 @@ class Dataset:
             .join(objectives, on="match_id", how="inner")
             .join(exp_adv, on="match_id", how="inner")
             .join(gold_adv, on="match_id", how="inner")
+            .filter(
+                (pl.col("radiant_picks").list.len() == 5) &
+                (pl.col("dire_picks").list.len() == 5) &
+
+                (pl.col("radiant_bans").list.len() == 7) &
+                (pl.col("dire_bans").list.len() == 7)
+            )
             .with_columns(
                 *[
                     pl.col(col).str.to_decimal().alias(col)

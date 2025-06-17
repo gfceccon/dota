@@ -1,3 +1,4 @@
+import csv
 from typing import Optional, Any, cast
 import torch.nn as nn
 from torch import FloatTensor, Tensor, LongTensor, IntTensor
@@ -45,6 +46,10 @@ class Dota2AE(nn.Module):
             for name, emb in zip(embeddings_config.keys(), embeddings)
         }
 
+        self.encoder_layers = encoder_layers
+        self.decoder_layers = decoder_layers
+        self.embeddings_config = embeddings_config
+
         # Dimensões e hiperparâmetros do modelo
         self.latent_dim = latent_dim
         self.input_dim = input_dim
@@ -53,6 +58,7 @@ class Dota2AE(nn.Module):
 
         self.name = f"Dota2AE_{name}"
         self.best_filename = f"Dota2AE_{name}_best.h5"
+        self.loss_path = f"./Dota2AE_{name}_loss.csv"
 
         # Inicializa as camadas do modelo
         self.encoder, self.decoder = self.create_ae(
@@ -65,6 +71,7 @@ class Dota2AE(nn.Module):
         self.patience = patience
         self.batch_size = batch_size
         self.early_stopping = early_stopping
+        self.mse = nn.MSELoss(reduction='mean')
 
         # Históricos de loss
         self.train_stopped = 0
@@ -107,33 +114,27 @@ class Dota2AE(nn.Module):
 
         return encoder, decoder
 
-    def flatten(self, data: np.ndarray[Any, Any]) -> torch.Tensor:
-
-        flat = torch.cat([
-        ], dim=1).to(self.device)
-        return flat
-
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         latent = self.encoder(x)
         reconstructed = self.decoder(latent)
         return latent, reconstructed
 
     def encode(self, data: np.ndarray[Any, Any]) -> tuple[torch.Tensor, torch.Tensor]:
-        tensor = self.flatten(data)
+        tensor = torch.tensor(data, device=self.device, dtype=torch.float32)
         latent, reconstructed = self.forward(tensor)
         return latent, reconstructed
 
+    def pad_sequences(self, sequences, dtype, value=0):
+        """
+        Faz padding em uma lista de arrays/listas para que todos tenham o mesmo tamanho.
+        """
+        max_len = max(len(seq) for seq in sequences)
+        return np.array([
+            np.pad(seq, (0, max_len - len(seq)),
+                    mode='constant', constant_values=value)
+            for seq in sequences
+        ], dtype=dtype)
     def train_data(self, training_df_path: str, validation_df_path: str, columns: dict[str, bool], emb_columns: dict[str, bool]) -> None:
-        def pad_sequences(sequences, dtype, value=0):
-            """
-            Faz padding em uma lista de arrays/listas para que todos tenham o mesmo tamanho.
-            """
-            max_len = max(len(seq) for seq in sequences)
-            return np.array([
-                np.pad(seq, (0, max_len - len(seq)),
-                       mode='constant', constant_values=value)
-                for seq in sequences
-            ], dtype=dtype)
 
         epochs_no_improve = 0
         best_state = None
@@ -151,19 +152,32 @@ class Dota2AE(nn.Module):
             for _data in pd.read_json(training_df_path, orient='records', lines=True, chunksize=self.batch_size):
                 _data = cast(pd.DataFrame, _data)
                 tensor_array = []
+                batch_size = len(_data)
+
                 for col in columns:
-                    log.info(f"Processando coluna: {col}")
                     if columns[col]:
-                        tensor_array.append(torch.tensor(pad_sequences(
-                            _data[col].values, dtype=np.float32), device=self.device))
+                        # Tensor shape: [batch_size, sequence_length]
+                        tensor = torch.tensor(self.pad_sequences(
+                            _data[col].values, dtype=np.float32), device=self.device)
+                        # Flatten para garantir um vetor por amostra
+                        tensor = tensor.view(batch_size, -1)
+                        tensor_array.append(tensor)
+
                 for col in emb_columns:
-                    emb = self.embeddings[col]
-                    if isinstance(emb, nn.Embedding) and emb_columns[col]:
-                        log.info(f"Processando coluna de embedding: {col}")
-                        embedded: Tensor = emb(torch.tensor(pad_sequences(_data[col].values, dtype=np.int32),device=self.device))
+                    embed = self.embeddings[col]
+                    if isinstance(embed, nn.Embedding) and emb_columns[col]:
+                        # Tensor shape: [batch_size, sequence_length]
+                        ids = torch.tensor(self.pad_sequences(
+                            _data[col].values, dtype=np.int32), device=self.device)
+                        # Embedding shape: [batch_size, sequence_length, embedding_dim]
+                        embedded = embed(ids)
+                        # Reshape para [batch_size, sequence_length * embedding_dim]
+                        embedded = embedded.view(batch_size, -1)
                         tensor_array.append(embedded)
 
-                data = torch.cat(tensor_array, dim=0).to(self.device)
+                # Concatenar todos os tensores ao longo da dimensão 1 (colunas)
+                data = torch.cat(tensor_array, dim=1).to(self.device)
+
                 self.optimizer.zero_grad()
                 latent, reconstructed = self.forward(data)
                 loss = self.loss(data, reconstructed)
@@ -176,9 +190,35 @@ class Dota2AE(nn.Module):
             self.eval()
             count = 0
             with torch.no_grad():
-                for batch_eval in pd.read_csv(validation_df_path, chunksize=self.batch_size):
-                    _, reconstructed = self.forward(batch_eval)
-                    val_loss = self.loss(batch_eval, reconstructed).item()
+                for batch_eval in pd.read_json(validation_df_path, orient='records', lines=True, chunksize=self.batch_size):
+                    batch_eval = cast(pd.DataFrame, batch_eval)
+                    tensor_array = []
+                    batch_size = len(batch_eval)
+
+                    # Processar colunas numéricas
+                    for col in columns:
+                        if columns[col]:
+                            tensor = torch.tensor(self.pad_sequences(
+                                batch_eval[col].values, dtype=np.float32), device=self.device)
+                            tensor = tensor.view(batch_size, -1)
+                            tensor_array.append(tensor)
+
+                    # Processar embeddings
+                    for col in emb_columns:
+                        embed = self.embeddings[col]
+                        if isinstance(embed, nn.Embedding) and emb_columns[col]:
+                            ids = torch.tensor(self.pad_sequences(
+                                batch_eval[col].values, dtype=np.int32), device=self.device)
+                            embedded = embed(ids)
+                            embedded = embedded.view(batch_size, -1)
+                            tensor_array.append(embedded)
+
+                    # Concatenar os tensores
+                    val_data = torch.cat(tensor_array, dim=1).to(self.device)
+
+                    # Passar pelo modelo
+                    _, reconstructed = self.forward(val_data)
+                    val_loss = self.loss(val_data, reconstructed).item()
                     total_val_loss += val_loss
                     count += 1
 
@@ -194,15 +234,11 @@ class Dota2AE(nn.Module):
                     epochs_no_improve = 0
                     best_state = self.state_dict()
 
-                    # self.save_model(self.best_filename)
-                    if self.verbose and not self.silent:
-                        log.info(
-                            f"Melhor modelo salvo em {self.best_filename} (Val Loss: {self.best_val_loss:.4f})")
+                    self.save_model()
                 else:
                     epochs_no_improve += 1
-                    if self.verbose and not self.silent:
-                        log.info(
-                            f"Nenhuma melhora na validação por {epochs_no_improve} épocas.")
+                    log.info(
+                        f"Nenhuma melhora na validação por {epochs_no_improve} épocas.")
                 if epochs_no_improve >= self.patience:
                     self.train_stopped = epoch + 1
                     log.info(f"Early stopping ativado após {epoch+1} épocas.")
@@ -217,29 +253,47 @@ class Dota2AE(nn.Module):
                 self.load_state_dict(best_state)
             log.timer_end(training_log)
 
-#     def test_model(self, test_df: pl.DataFrame, batch_size: int = 32, threshold=0.01) -> tuple[float, float, float, float]:
-#         self.eval()
-#         correct = 0
-#         total = 0
-#         total_mse = 0.0
-#         min_mse = float('inf')
-#         max_mse = float('-inf')
-#         with torch.no_grad():
-#             for batch in test_df.iter_slices(batch_size):
-#                 batch_np = batch.to_numpy()
-#                 original = self.flatten(batch_np, min(
-#                     batch_size, batch_np.shape[0]), columns=test_df.columns)
-#                 latent, reconstructed = self.forward(original)
-#                 mse = self.loss(original, reconstructed).item()
-#                 total_mse += float(mse)
-#                 min_mse = min(min_mse, mse)
-#                 max_mse = max(max_mse, mse)
-#                 if mse < threshold:
-#                     correct += 1
-#                 total += 1
-#         accuracy = correct / total if total > 0 else 1
-#         avg_mse = total_mse / total if total > 0 else 1
-#         return accuracy, avg_mse, min_mse, max_mse
+    # def test_model(self, test_df: str, columns, emb_columns, threshold=0.01) -> tuple[float, float, float, float]:
+    #     self.eval()
+    #     correct = 0
+    #     total = 0
+    #     total_mse = 0.0
+    #     min_mse = float('inf')
+    #     max_mse = float('-inf')
+    #     with torch.no_grad():
+    #         for batch in pd.read_json(test_df, orient='records', lines=True, chunksize=self.batch_size):
+    #             # Processar colunas numéricas
+    #             _data = cast(pd.DataFrame, batch)
+    #             tensor_array = []
+    #             batch_size = len(_data)
+    #             for col in columns:
+    #                 if columns[col]:
+    #                     tensor = torch.tensor(self.pad_sequences(
+    #                         batch[col].values, dtype=np.float32), device=self.device)
+    #                     tensor = tensor.view(batch_size, -1)
+    #                     tensor_array.append(tensor)
+
+    #             # Processar embeddings
+    #             for col in emb_columns:
+    #                 embed = self.embeddings[col]
+    #                 if isinstance(embed, nn.Embedding) and emb_columns[col]:
+    #                     ids = torch.tensor(self.pad_sequences(
+    #                         _data[col].values, dtype=np.int32), device=self.device)
+    #                     embedded = embed(ids)
+    #                     embedded = embedded.view(batch_size, -1)
+    #                     tensor_array.append(embedded)
+
+    #             mse = self.loss(original, reconstructed).item()
+    #             # Concatenar os tensores
+    #             val_data = torch.cat(tensor_array, dim=1).to(self.device)
+    #             min_mse = min(min_mse, self.mse)
+    #             max_mse = max(max_mse, self.mse)
+    #             if mse < threshold:
+    #                 correct += 1
+    #             total += 1
+    #     accuracy = correct / total if total > 0 else 1
+    #     avg_mse = total_mse / total if total > 0 else 1
+    #     return accuracy, avg_mse, min_mse, max_mse
 
     def save_model(self):
         path = f"./best/{self.name}.h5"
@@ -264,27 +318,23 @@ class Dota2AE(nn.Module):
         torch.save(checkpoint, path)
         log.info(f"Modelo salvo em {path}")
 
-#     @classmethod
-#     def load_model(cls, path: str, **override_args):
-#         location = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#         with torch.serialization.safe_globals([pl.series.series.Series]):
-#             checkpoint = torch.load(path, map_location=location)
-#             model_args = checkpoint['model_args']
-#             model_args.update(override_args)
-#             model = cls(**model_args)
-#             model.load_state_dict(checkpoint['state_dict'])
-#             model.eval()
-#             log.info(f"Modelo carregado de {path}")
-#             return model
+    @classmethod
+    def load_model(cls, path: str, **override_args):
+        location = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        checkpoint = torch.load(path, map_location=location)
+        model_args = checkpoint['model_args']
+        model_args.update(override_args)
+        model = cls(**model_args)
+        model.load_state_dict(checkpoint['state_dict'])
+        model.eval()
+        log.info(f"Modelo carregado de {path}")
+        return model
 
-#     def save_loss_history(self, path: Optional[str] = None, silent: bool = False):
-#         self.silent = silent
-#         if path is None:
-#             path = f"./best/{self.base_filename}_loss.csv"
-#         with open(path, 'w', newline='') as f:
-#             writer = csv.writer(f)
-#             writer.writerow(['loss', 'eval_loss'])
-#             for loss, eval in zip(self.loss_history, self.val_loss_history):
-#                 writer.writerow([loss, eval])
-#         if not self.silent:
-#             log.info(f"Histórico de loss salvo em {path}")
+    def save_loss_history(self, ):
+        with open(self.loss_path, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['loss', 'eval_loss'])
+            for loss, eval in zip(self.loss_history, self.val_loss_history):
+                writer.writerow([loss, eval])
+        if not self.silent:
+            log.info(f"Histórico de loss salvo em {self.loss_path}")
