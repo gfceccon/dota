@@ -36,7 +36,7 @@ players = [
     "kills", "deaths", "assists",
     "last_hits", "denies",
     "gold_per_min", "xp_per_min", "level", "net_worth",
-    "hero_damage","tower_damage", "hero_healing", 
+    "hero_damage", "tower_damage", "hero_healing",
     "total_gold", "total_xp",
     "neutral_kills", "tower_kills", "courier_kills",
     "hero_kills", "observer_kills", "sentry_kills", "roshan_kills",
@@ -60,3 +60,6 @@ heroes = [
     "move_speed", "day_vision", "night_vision",
     "localized_name"]
 patches = ["patch", "date"]
+
+items = [
+    "id", "name",]

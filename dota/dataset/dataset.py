@@ -7,12 +7,14 @@ import polars as pl
 from dota.logger import LogLevel, get_logger
 import dota.dataset.headers as cols
 import dota.dataset.schemas as schema
+import pandas as pd
 
 log = get_logger('dataset', LogLevel.INFO, False)
 
 
 LEAGUES = f"Constants/Constants.Leagues.csv"
 HEROES = f"Constants/Constants.Heroes.csv"
+ITEMS = f"Constants/Constants.ItemIDs.csv"
 PATCHES = f"Constants/Constants.Patch.csv"
 
 
@@ -28,18 +30,9 @@ def TEAM_FIGHTS(x): return f"{x}/teamfights.csv"
 class Dataset:
 
     def __init__(self,
-                 duration: tuple[int, int] = (10 * 60, 120 * 60),
+                 duration: tuple[int, int] = (10 * 60, 150 * 60),
                  tier: list[str] = ['professional', 'premium'],
-                 years: tuple[int, int] = (2021, 2025),
-                 dataset: Optional[
-                     tuple[
-                         pl.LazyFrame,  # Dataset
-                         pl.LazyFrame,  # Heroes
-                         pl.LazyFrame,  # Patches
-                         pl.LazyFrame,  # Metadata
-                         pl.LazyFrame,  # Leagues
-                     ]
-                 ] = None):
+                 years: tuple[int, int] = (2021, 2025)):
         self.data_path = "dota2_data"
         self.dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
         self.path = kagglehub.dataset_download(self.dataset_name)
@@ -72,24 +65,22 @@ class Dataset:
             "id").collect().to_series().to_list()
         self.dict_hero_index = {hid: i for i, hid in enumerate(self.hero_ids)}
 
-        if (dataset is not None):
-            self.data, self.heroes, self.patches, self.metadata, self.leagues = dataset
-            if not isinstance(self.data, pl.LazyFrame):
-                raise TypeError("Dataset must be a LazyFrame")
-            if not isinstance(self.heroes, pl.LazyFrame):
-                raise TypeError("Heroes must be a LazyFrame")
-            if not isinstance(self.patches, pl.LazyFrame):
-                raise TypeError("Patches must be a LazyFrame")
-            if not isinstance(self.metadata, pl.LazyFrame):
-                raise TypeError("Metadata must be a LazyFrame")
-            if not isinstance(self.leagues, pl.LazyFrame):
-                raise TypeError("Leagues must be a LazyFrame")
-        else:
-            self.data = None
-            self.heroes = self._heroes()
-            self.patches = self._patches()
-            self.metadata = self._metadata()
-            self.leagues = self._leagues()
+        _all_items = self._get_lf(ITEMS, cols.items)
+        self.items_id = _all_items.select(pl.col("id")).unique().sort(
+            "id").collect().to_series().to_list()
+        self.dict_items_index = {hid: i for i, hid in enumerate(self.items_id)}
+
+        self.heroes = self._heroes()
+        self.patches = self._patches()
+        self.metadata = self._metadata()
+        self.leagues = self._leagues()
+        self.items = self._items()
+
+    def get_data(self) -> pl.LazyFrame:
+        if (self.data is None):
+            raise ValueError(
+                "Dataset is not initialized. Call get_year() or save_dataset() first.")
+        return self.data
 
     def get_heroes_usage(self, year: int) -> pl.LazyFrame:
         picks_bans = self._picks_bans(year).with_columns(
@@ -130,9 +121,10 @@ class Dataset:
         games = self._games(year)
         exp_adv = self._exp_adv(year)
         gold_adv = self._gold_adv(year)
-        team_fights = self._team_fights(year)
+        # Dados de team_fights ainda não estão sendo utilizados
+        # team_fights = self._team_fights(year)
 
-        data = (
+        self.data = (
             metadata
             .join(self.patches, on="patch", how="inner")
             .join(self.leagues, on="leagueid", how="inner")
@@ -153,6 +145,15 @@ class Dataset:
                     pl.col("hero_idx")).drop_nulls().alias("radiant_bans"),
                 pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
                     pl.col("hero_idx")).drop_nulls().alias("dire_bans"),
+
+                pl.concat_list([
+                    pl.col(f"item_{x}_idx").drop_nulls()
+                    for x in range(0, 6)
+                ]).alias("items"),
+                pl.concat_list([
+                    pl.col(f"backpack_{x}_idx").drop_nulls()
+                    for x in range(0, 3)
+                ]).alias("backpack"),
             ])
             .join(objectives, on="match_id", how="inner")
             .join(exp_adv, on="match_id", how="inner")
@@ -181,7 +182,8 @@ class Dataset:
                 ],
             )
         )
-        return data
+
+        return self.data
 
     def _patches(self) -> pl.LazyFrame:
         patch_count: dict[int, tuple[str, str, int]] = {}
@@ -239,14 +241,23 @@ class Dataset:
                 .alias("hero_idx"),
             )
             .with_columns(
-                pl.col("roles").map_elements(
-                    lambda x: [1 if i in x else 0 for i in self.roles_idx],
-                    return_dtype=pl.List(pl.Int32)
-                ).alias("roles_vector"),
+                pl.col("roles").replace(self.dict_roles).alias("roles_vector"),
                 pl.col("localized_name").alias("hero_name"),
             )
         )
         return heroes
+
+    def _items(self) -> pl.LazyFrame:
+        items = (
+            self._get_lf(ITEMS, cols.items)
+            .with_columns(
+                pl.col("id").cast(pl.Int32).alias("id"),
+                pl.col("id").replace(self.dict_items_index).cast(
+                    pl.Int32).alias("item_id"),
+                pl.col("name"),
+            )
+        )
+        return items
 
     def _picks_bans(self, year: int) -> pl.LazyFrame:
         picks_bans = self._get_lf(PICKS_BANS(str(year)), cols.picks_bans)
@@ -307,7 +318,12 @@ class Dataset:
                 *[pl.col({col}).str
                   .extract_all(r"(\d+)")
                   .list.eval(pl.element().cast(pl.Int32))
-                  .alias(f"{col}") for col in ["lh_t", "dn_t", "xp_t", "gold_t"]]
+                  .alias(f"{col}") for col in ["lh_t", "dn_t", "xp_t", "gold_t"]],
+
+                *[pl.col(f"item_{x}").replace(self.dict_items_index).alias(f"item_{x}_idx")
+                  for x in range(0, 6)],
+                *[pl.col(f"backpack_{x}").replace(self.dict_items_index).alias(
+                    f"backpack_{x}_idx") for x in range(0, 3)],
             )
             .join(self._picks_bans(year), on=["match_id", "hero_id"], how="right")
         )
@@ -355,92 +371,57 @@ class Dataset:
         )
         return lf
 
-    def save_dataset(self, year: int, sample: int = 0, ti: bool = False):
-        if year is not None:
-            if not (self.years[0] <= year < self.years[1]):
-                raise ValueError(
-                    f"Year {year} is not in the range {self.years}")
-        os.makedirs(self.data_path, exist_ok=True)
+    def save_dataset(self, year: int) -> pl.DataFrame:
         path = f"{self.data_path}/{year}"
         os.makedirs(path, exist_ok=True)
 
-        if ti is False:
-            df = self.get_year(year).collect()
-        elif ti is True:
-            df = (
-                self.get_year(year)
-                .filter(pl.col("leaguename")
-                        .eq(f"The International {year}"))
-                .collect())
-
-        if sample > 0:
-            df = df.sample(n=sample, shuffle=True, seed=42)
-
-        with open(f"{path}/dataset_schema{"_ti" if ti else ""}.txt", "w") as f:
+        df = self.get_year(year).collect()
+        with open(f"{path}/dataset_schema.txt", "w") as f:
             f.write(str(df.collect_schema()))
-        df.write_json(f"{path}/dataset{"_ti" if ti else ""}.json")
+        df.write_json(f"{path}/dataset.json")
 
-        print(f"Year {year} matches:", df.shape[0])
+        train_df = df.sample(fraction=0.7, seed=42, shuffle=True)
+        val_df = df.sample(fraction=0.15, seed=42, shuffle=True)
+        test_df = df.sample(fraction=0.15, seed=42, shuffle=True)
 
-        df = self._objectives(year).collect()
-        df.write_json(f"{path}/objectives.json")
+        train_df.write_json(f"{path}/train_pl.json",)
+        val_df.write_json(f"{path}/val_pl.json", )
+        test_df.write_json(f"{path}/test_pl.json", )
 
-        df = self._exp_adv(year).collect()
-        df.write_json(f"{path}/xp_adv.json")
+        train_df.to_pandas().to_csv(f"{path}/train.csv", index=False)
+        val_df.to_pandas().to_csv(f"{path}/val.csv", index=False)
+        test_df.to_pandas().to_csv(f"{path}/test.csv", index=False)
 
-        df = self._gold_adv(year).collect()
-        df.write_json(f"{path}/gold_adv.json")
+        train_df.to_pandas().to_json(f"{path}/train.json", orient='records', lines=True)
+        val_df.to_pandas().to_json(f"{path}/val.json", orient='records', lines=True)
+        test_df.to_pandas().to_json(f"{path}/test.json", orient='records', lines=True)
 
-        df = self._team_fights(year).collect()
-        df.write_json(f"{path}/team_fights.json")
 
-        df = self._picks_bans(year).collect()
-        df.write_json(f"{path}/picks_bans.json")
+        log.info(f"Dataset for year {year} saved at {path}/dataset.json")
+        log.info(
+            f"Train, validation and test sets saved at {path}/train.csv, {path}/val.csv, {path}/test.csv")
 
-    def save_metadata(self):
-        os.makedirs(self.data_path, exist_ok=True)
-
-        df = self.heroes.collect()
-        with open(f"{self.data_path}/heroes_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
-        df.write_json(f"{self.data_path}/heroes.json")
-
-        df = self.metadata.collect()
-        with open(f"{self.data_path}/metadata_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
-        df.write_json(f"{self.data_path}/metadata.json")
-
-        df = self.leagues.collect()
-        with open(f"{self.data_path}/leagues_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
-        df.write_json(f"{self.data_path}/leagues.json")
-
-        df = self.patches.collect()
-        with open(f"{self.data_path}/patches_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
-        df.write_json(f"{self.data_path}/patches.json")
+        return df
 
     @staticmethod
-    def load(path: str, year: int) -> tuple[
-            pl.LazyFrame,
-            pl.LazyFrame,
-            pl.LazyFrame,
-            pl.LazyFrame,
-            pl.LazyFrame,]:
+    def load_json(path: str, year: int) -> pd.DataFrame:
         if not (2021 <= year < 2025):
             raise ValueError("Year must be between 2021 and 2024")
         _path = f"{path}/dota2_data/{year}/dataset.json"
         if not os.path.exists(_path):
             raise FileNotFoundError(
                 f"Dataset for year {year} not found at {_path}")
-        return (
-            pl.scan_ndjson(_path, schema=schema.dataset_schema),  # Dataset
-            pl.scan_ndjson(f"{path}/dota2_data/heroes.json",
-                           schema=schema.heroes_schema),  # Heroes
-            pl.scan_ndjson(f"{path}/dota2_data/patches.json",
-                           schema=schema.patches_schema),  # Patches
-            pl.scan_ndjson(f"{path}/dota2_data/metadata.json",
-                           schema=schema.metadata_schema),  # Metadata
-            pl.scan_ndjson(f"{path}/dota2_data/leagues.json",
-                           schema=schema.leagues_schema),  # Leagues
-        )
+        json = pd.read_json(_path, orient='records')
+        return json
+
+    @staticmethod
+    def load_csv_train(path: str, year: int, chunk_size: int = 64):
+        if not (2021 <= year < 2025):
+            raise ValueError("Year must be between 2021 and 2024")
+        _train = f"{path}/dota2_data/{year}/train.json"
+        _val = f"{path}/dota2_data/{year}/val.json"
+        _test = f"{path}/dota2_data/{year}/test.json"
+        if not os.path.exists(_train) or not os.path.exists(_val) or not os.path.exists(_test):
+            raise FileNotFoundError(
+                f"Dataset for year {year} not found")
+        return pd.read_json(_train, orient='records',)

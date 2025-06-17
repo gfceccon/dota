@@ -2,7 +2,7 @@ import os
 import argparse
 from dota import Dota2
 from dota import Dataset
-import polars as pl
+import pandas as pd
 
 
 if __name__ == "__main__":
@@ -12,12 +12,6 @@ if __name__ == "__main__":
     
     if args.year:
         print(f"Carregando ano {args.year}...")
-        dataset_lf = Dataset.load(os.getcwd(), args.year)
-        dataset = Dataset(
-            dataset=dataset_lf
-        )
-        lf = dataset.data
-        if lf is not None:
-            print(lf.head().collect())
+        dota = Dota2(args.year)
     else:
         print("Use o argumento --year para processar dados de um ano específico (2021-2024)")

@@ -2,11 +2,11 @@ import logging
 import time
 import sys
 import os
+from enum import Enum
 from datetime import datetime
 from typing import Optional, Dict, Any
-from enum import Enum
-import threading
 from pathlib import Path
+import threading
 
 
 class LogLevel(Enum):
