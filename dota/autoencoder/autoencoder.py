@@ -50,6 +50,10 @@ class Dota2AE(nn.Module):
         self.decoder_layers = decoder_layers
         self.embeddings_config = embeddings_config
 
+        self.encoder_layers = encoder_layers
+        self.decoder_layers = decoder_layers
+        self.embeddings_config = embeddings_config
+
         # Dimensões e hiperparâmetros do modelo
         self.latent_dim = latent_dim
         self.input_dim = input_dim
@@ -71,6 +75,7 @@ class Dota2AE(nn.Module):
         self.patience = patience
         self.batch_size = batch_size
         self.early_stopping = early_stopping
+        self.mse = nn.MSELoss(reduction='mean')
         self.mse = nn.MSELoss(reduction='mean')
 
         # Históricos de loss
@@ -120,6 +125,7 @@ class Dota2AE(nn.Module):
         return latent, reconstructed
 
     def encode(self, data: np.ndarray[Any, Any]) -> tuple[torch.Tensor, torch.Tensor]:
+        tensor = torch.tensor(data, device=self.device, dtype=torch.float32)
         tensor = torch.tensor(data, device=self.device, dtype=torch.float32)
         latent, reconstructed = self.forward(tensor)
         return latent, reconstructed

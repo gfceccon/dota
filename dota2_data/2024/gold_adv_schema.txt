@@ -1,1 +1,0 @@
-Schema({'match_id': Int64, 'gold_adv': List(Float64)})
