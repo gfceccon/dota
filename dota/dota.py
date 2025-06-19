@@ -14,8 +14,32 @@ os.makedirs("best", exist_ok=True)
 
 log = get_logger("Dota2")
 
+
 class Dota2():
     config = {
+        "match_id": True,
+        "start_time": True,
+        "player_slot": True,
+        "obs_placed": True,
+        "sen_placed": True,
+        "creeps_stacked": True,
+        "camps_stacked": True,
+        "rune_pickups": True,
+        "firstblood_claimed": True,
+        "teamfight_participation": True,
+        "towers_killed": True,
+        "roshans_killed": True,
+        "stuns": True,
+        "times": True,
+        "gold_t": True,
+        "lh_t": True,
+        "dn_t": True,
+        "xp_t": True,
+        "party_id": True,
+        "account_id": True,
+        "hero_id": True,
+        "items_vector": True,
+        "backpack_vector": True,
         "item_neutral": True,
         "kills": True,
         "deaths": True,
@@ -29,11 +53,12 @@ class Dota2():
         "hero_damage": True,
         "tower_damage": True,
         "hero_healing": True,
-        "total_gold": True,
-        "total_xp": True,
+        "gold": True,
+        "gold_spent": True,
         "neutral_kills": True,
         "tower_kills": True,
         "courier_kills": True,
+        "lane_kills": True,
         "hero_kills": True,
         "observer_kills": True,
         "sentry_kills": True,
@@ -41,8 +66,37 @@ class Dota2():
         "necronomicon_kills": True,
         "ancient_kills": True,
         "buyback_count": True,
+        "purchase_ward_observer": True,
+        "purchase_ward_sentry": True,
         "purchase_gem": True,
         "purchase_rapier": True,
+        "is_pick": True,
+        "team": True,
+        "order": True,
+        "version": True,
+        "leagueid": True,
+        "start_date_time": True,
+        "duration": True,
+        "patch": True,
+        "region": True,
+        "series_id": True,
+        "series_type": True,
+        "radiant_win": True,
+        "tower_status_radiant": True,
+        "tower_status_dire": True,
+        "barracks_status_radiant": True,
+        "barracks_status_dire": True,
+        "leaguename": True,
+        "tier": True,
+        "gold_adv": True,
+        "exp_adv": True,
+        "hero_name": True,
+        "attack_type": True,
+        "roles_vector": True,
+        "attack_range": True,
+        "move_speed": True,
+        "day_vision": True,
+        "night_vision": True
     }
 
     emb_config = {
@@ -60,54 +114,47 @@ class Dota2():
         "neutral_items": False,
     }
 
-    columns = {
-        "player_radiant_stats": True,
-        "player_dire_stats": True,
-    }
-
     def __init__(self, year: int):
-        ds = Dataset()
+        ds = Dataset(year)
         self._dataset = ds
-        self.path = f"{ds.data_path}/{year}"
 
-        self.dict_attributes = len(ds.dict_attributes) + 1
-        self.dict_pick = len(ds.dict_hero_index) + 1
-        self.dict_ban = len(ds.dict_hero_index) + 1
-        self.dict_roles = len(ds.dict_roles) + 1
-        self.dict_items = len(ds.items_id) + 1
+        self.emb_attr = ds.config.attr_mapping
+        self.emb_role = ds.config.role_mapping
+        self.emb_item = ds.config.item_mapping
+        self.emb_hero = ds.config.hero_mapping
 
-        self.emb_pick = 32
-        self.emb_ban = 32
-        self.emb_items = 16
-        self.emb_role = 16
-        self.emb_attributes = 8
-        self.emb_neutral = 8
+        self.emb_pick_dim = 32
+        self.emb_ban_dim = 32
+        self.emb_item_dim = 16
+        self.emb_role_dim = 16
+        self.emb_attr_dim = 8
+        self.emb_neutral_dim = 8
 
         self.embeddings = {
-            "radiant_picks": (self.emb_pick, self.dict_pick),
-            "dire_picks": (self.emb_pick, self.dict_pick),
-            "radiant_bans": (self.emb_ban, self.dict_ban),
-            "dire_bans": (self.emb_ban, self.dict_ban),
+            "radiant_picks": (self.emb_hero, self.emb_pick_dim),
+            "dire_picks": (self.emb_hero, self.emb_pick_dim),
+            "radiant_bans": (self.emb_hero, self.emb_ban_dim),
+            "dire_bans": (self.emb_hero, self.emb_ban_dim),
 
 
-            "radiant_roles_picks": (self.emb_role, self.dict_roles),
-            "dire_roles_picks": (self.emb_role, self.dict_roles),
-            "radiant_roles_bans": (self.emb_role, self.dict_roles),
-            "dire_roles_bans": (self.emb_role, self.dict_roles),
+            "radiant_roles_picks": (self.emb_role, self.emb_role_dim),
+            "dire_roles_picks": (self.emb_role, self.emb_role_dim),
+            "radiant_roles_bans": (self.emb_role, self.emb_role_dim),
+            "dire_roles_bans": (self.emb_role, self.emb_role_dim),
 
-            "radiant_attributes": (self.emb_attributes, self.dict_attributes),
-            "dire_attributes": (self.emb_attributes, self.dict_attributes),
-            "radiant_attack": (self.emb_attributes, self.dict_attributes),
-            "dire_attack": (self.emb_attributes, self.dict_attributes),
+            "radiant_attributes": (self.emb_attr, self.emb_attr_dim),
+            "dire_attributes": (self.emb_attr, self.emb_attr_dim),
+            "radiant_attack": (self.emb_attr, self.emb_attr_dim),
+            "dire_attack": (self.emb_attr, self.emb_attr_dim),
 
-            "radiant_items": (self.emb_items, self.dict_items),
-            "dire_items": (self.emb_items, self.dict_items),
+            "radiant_items": (self.emb_item, self.emb_item_dim),
+            "dire_items": (self.emb_item, self.emb_item_dim),
 
-            "radiant_backpack": (self.emb_items, self.dict_items),
-            "dire_backpack": (self.emb_items, self.dict_items),
+            "radiant_backpack": (self.emb_item, self.emb_item_dim),
+            "dire_backpack": (self.emb_item, self.emb_item_dim),
 
-            "radiant_neutral_items": (self.emb_neutral, self.dict_items),
-            "dire_neutral_items": (self.emb_neutral, self.dict_items),
+            "radiant_neutral_items": (self.emb_item, self.emb_neutral_dim),
+            "dire_neutral_items": (self.emb_item, self.emb_neutral_dim),
         }
 
         self.dropout = 0.2
@@ -143,41 +190,17 @@ class Dota2():
         log.info(f"Learning Rate: {self.lr}")
         log.info(f"Epochs: {self.epochs}")
         log.info(f"Patience: {self.patience}")
-        log.info(f"Path: {self.path}")
-        log.info(f"Radiant Picks Embedding: {self.emb_pick}")
-        log.info(f"Dire Picks Embedding: {self.emb_pick}")
-        log.info(f"Radiant Bans Embedding: {self.emb_ban}")
-        log.info(f"Dire Bans Embedding: {self.emb_ban}")
-        log.info(f"Items Embedding: {self.emb_items}")
-        log.info(f"Backpack Embedding: {self.emb_items}")
-        log.info(f"Neutral Items Embedding: {self.emb_items}")
+        log.info(f"Path: {self._dataset.cache_path}")
+        log.info(f"Radiant Picks Embedding: {self.emb_pick_dim}")
+        log.info(f"Dire Picks Embedding: {self.emb_pick_dim}")
+        log.info(f"Radiant Bans Embedding: {self.emb_ban_dim}")
+        log.info(f"Dire Bans Embedding: {self.emb_ban_dim}")
+        log.info(f"Items Embedding: {self.emb_item_dim}")
+        log.info(f"Backpack Embedding: {self.emb_item_dim}")
+        log.info(f"Neutral Items Embedding: {self.emb_item_dim}")
         log.info(f"Roles Vector Embedding: {self.emb_role}")
-        log.info(f"Primary Attribute Embedding: {self.emb_attributes}")
+        log.info(f"Primary Attribute Embedding: {self.emb_attr_dim}")
         log.separator()
-
-        self.ae = Dota2AE(
-            name="Dota2AE",
-            input_dim=self.calc_input_dim(),
-            latent_dim=self.latent_dim,
-            encoder_layers=self.encoder_layers,
-            decoder_layers=self.decoder_layers,
-            dropout=self.dropout,
-            batch_size=self.batch_size,
-            lr=self.lr,
-            epochs=self.epochs,
-            patience=self.patience,
-            early_stopping=True,
-            embeddings_config=self.embeddings,
-        )
-
-        self.ae.train_data(
-            f"{self.path}/train.json",
-            f"{self.path}/val.json",
-            self.columns,
-            "player_radiant_stats",
-            "player_dire_stats",
-            self.emb_config)
-        # self.cluster = Dota2Cluster()
 
     def calc_input_dim(self):
         dim = (
@@ -185,21 +208,21 @@ class Dota2():
             sum([1 if self.config[key] else 0
                  for key in self.config.keys()]))
 
-        dim += self.emb_pick * 2 * self.n_players
-        dim += self.emb_ban * 2 * self.n_bans
+        dim += self.emb_pick_dim * 2 * self.n_players
+        dim += self.emb_pick_dim * 2 * self.n_bans
 
-        if(self.emb_config["roles_pick"]):
-            dim += self.emb_role * 2 * self.n_players
-        if(self.emb_config["roles_ban"]):
-            dim += self.emb_role * 2 * self.n_bans
-        if(self.emb_config["attributes"]):
-            dim += self.emb_attributes * 2 * self.n_players
-        if(self.emb_config["attack"]):
-            dim += self.emb_attributes * 2 * self.n_players
-        if(self.emb_config["items"]):
-            dim += self.emb_items * 2 * self.n_players
-        if(self.emb_config["backpack"]):
-            dim += self.emb_items * 2 * self.n_players
-        if(self.emb_config["neutral_items"]):
-            dim += self.emb_neutral * 2 * self.n_players
+        if (self.emb_config["roles_pick"]):
+            dim += self.emb_role_dim * 2 * self.n_players
+        if (self.emb_config["roles_ban"]):
+            dim += self.emb_role_dim * 2 * self.n_bans
+        if (self.emb_config["attributes"]):
+            dim += self.emb_attr_dim * 2 * self.n_players
+        if (self.emb_config["attack"]):
+            dim += self.emb_attr_dim * 2 * self.n_players
+        if (self.emb_config["items"]):
+            dim += self.emb_item_dim * 2 * self.n_players
+        if (self.emb_config["backpack"]):
+            dim += self.emb_item_dim * 2 * self.n_players
+        if (self.emb_config["neutral_items"]):
+            dim += self.emb_neutral_dim * 2 * self.n_players
         return dim

@@ -20,7 +20,7 @@ if __name__ == "__main__":
         hash_str = random_hash()
         slice_path = os.path.join('tmp/slice', hash_str)
 
-        dataset = Dataset(year=2023)
+        dataset = Dataset(year=args.year)
         data = dataset.get()
 
         if not os.path.exists(slice_path):

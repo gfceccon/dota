@@ -278,10 +278,14 @@ class DatasetHelper:
         size = len(self.role_mapping)
         rows = []
         for h in heroes.iter_rows(named=True):
+            del h[""]
+            del h["id"]
+            del h["localized_name"]
+            del h["roles"]
             l = len(h["roles_vector"])
             h["roles_vector"] = sorted(h["roles_vector"] + [0] * (size - l))
             rows.append(h)
-        return pl.LazyFrame(rows).select(Schema.heroes_parsed_schema.keys())
+        return pl.LazyFrame(rows)
 
     def check_year(self, year: int) -> None:
         if not (self.start_year <= year <= self.end_year):
@@ -340,11 +344,11 @@ class Dataset:
         players.collect(engine='gpu').write_parquet(
             os.path.join(cache_dir, 'players.parquet'))
         # Gera o dado principal
-        player_aggregate = [pl.col(col).alias(
-            col) for col in Schema.players_parsed_schema.keys() if col != "match_id"]
         meta_aggregate = [pl.col(col).first().alias(
             col) for col in Schema.metadata_parsed_schema.keys() if col != "match_id"]
-        heroes_aggregate = [pl.col(col).first().alias(
+        player_aggregate = [pl.col(col).alias(
+            col) for col in Schema.players_parsed_schema.keys() if col != "match_id"]
+        heroes_aggregate = [pl.col(col).alias(
             col) for col in Schema.heroes_parsed_schema.keys() if col != "hero_id"]
         data = (
             metadata
@@ -381,12 +385,13 @@ class Dataset:
         self.check_year()
         log.separator()
         log.info(f"Criando metadados...")
-
+        min_duration, max_duration = self.config.duration
         metadata = (
             self.config
             .metadata()
             .join(self.config._leagues.lazy(), on="leagueid", how="inner")
-            .filter(pl.col("tier").is_in(self.config.tier))
+            .filter(pl.col("tier").is_in(self.config.tier),
+                    pl.col("duration").is_between(min_duration, max_duration))
             .join(self.gold(), on="match_id",)
             .join(self.exp(), on="match_id",)
             .unique(subset=["match_id"])
@@ -402,10 +407,12 @@ class Dataset:
         self.check_year()
         log.separator()
         log.info(f"Carregando dados dos jogadores...")
+        min_duration, max_duration = self.config.duration
         players = (
             self.config._players(self.year)
             .join(self.config._leagues.lazy(), on="leagueid", how="inner")
-            .filter(pl.col("tier").is_in(self.config.tier))
+            .filter(pl.col("tier").is_in(self.config.tier),
+                    pl.col("duration").is_between(min_duration, max_duration))
         )
         # Cast de string para lista nas colunas do schema que são listas
         list_columns = [
@@ -446,6 +453,7 @@ class Dataset:
             self.items_backpack(players)
             .select(select_columns)
         )
+
         return players
 
     def gold(self) -> pl.LazyFrame:

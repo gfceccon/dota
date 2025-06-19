@@ -219,12 +219,16 @@ class Schema:
         'str_gain': pl.Float64,
         'agi_gain': pl.Float64,
         'int_gain': pl.Float64,
+        'attack_range': pl.Float64,
+        'move_speed': pl.Float64,
+        'day_vision': pl.Float64,
+        'night_vision': pl.Float64,
     }
     
     heroes_parsed_schema = {
         'hero_id': pl.Float64,
         'hero_name': pl.String,
-        # 'primary_attribute': pl.Int64,
+        'primary_attribute': pl.Int64,
         'attack_type': pl.Int64,
         'roles_vector': pl.List(pl.Int32),
         # 'base_health': pl.Float64,
@@ -301,7 +305,7 @@ class Schema:
         'xp_t': pl.List(pl.Float64),
         # 'randomed': pl.Boolean,
         #'pred_vict': pl.Boolean,
-        'party_id': pl.Int64,
+        #'party_id': pl.Int64,
         #'permanent_buffs': pl.String,
         #'party_size': pl.Int64,
         'account_id': pl.Int64,
