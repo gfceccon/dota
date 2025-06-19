@@ -1,13 +1,13 @@
 import csv
-from typing import Optional, Any, cast
+from typing import Any, cast
 import torch.nn as nn
-from torch import FloatTensor, Tensor, LongTensor, IntTensor
+from torch import Tensor
 import numpy as np
 import pandas as pd
 import torch
 from dota.logger import get_logger
 
-log = get_logger("Dota2AE", log_file="autoencoder.log")
+log = get_logger("Dota2AE")
 
 
 class Dota2AE(nn.Module):

@@ -4,13 +4,13 @@ import os
 from typing import Optional
 import kagglehub
 import polars as pl
-from dota.logger import LogLevel, get_logger
+from dota.logger import get_logger
 import dota.dataset.headers as cols
 import dota.dataset.schemas as schema
 import pandas as pd
 import pandas as pd
 
-log = get_logger('dataset', LogLevel.INFO, False)
+log = get_logger('dataset')
 
 
 LEAGUES = f"Constants/Constants.Leagues.csv"

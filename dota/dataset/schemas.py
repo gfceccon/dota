@@ -182,7 +182,6 @@ items_schema = pl.Schema({
     "name": pl.String,
 })
 
-
 schema: dict[str, Any] = {
   # "match_id": pl.Int64,
   # "account_id": pl.List(pl.Int32),

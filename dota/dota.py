@@ -1,14 +1,8 @@
 import os
-from dota.autoencoder.autoencoder import Dota2AE
-from dota.autoencoder.cluster import Dota2Cluster
-from dota.autoencoder.autoencoder import Dota2AE
-from dota.autoencoder.cluster import Dota2Cluster
-from dota.logger import get_logger, LogLevel
+from dota.ai.autoencoder import Dota2AE
+from dota.ai.cluster import Dota2Cluster
+from dota.logger import get_logger
 from dota.dataset.dataset import Dataset
-import polars as pl
-import numpy as np
-import pandas as pd
-import polars as pl
 import numpy as np
 import pandas as pd
 
@@ -18,9 +12,7 @@ os.makedirs("loss_history", exist_ok=True)
 os.makedirs("reports", exist_ok=True)
 os.makedirs("best", exist_ok=True)
 
-
-log = get_logger("Dota2", log_file="dota2.log")
-
+log = get_logger("Dota2")
 
 class Dota2():
     config = {

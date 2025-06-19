@@ -3,9 +3,10 @@ import os
 import kagglehub
 import polars as pl
 from dota.logger import get_logger
+from .optimized_schema import OptimizedSchema
 import pandas as pd
 
-log = get_logger('dataset', log_file='/tmp/log/dota_dataset.log')
+log = get_logger()
 
 
 class OptimizedConfig:
@@ -13,7 +14,7 @@ class OptimizedConfig:
     data_path = '/tmp/dota/dataset/'
     LEAGUES = f"Constants/Constants.Leagues.csv"
     HEROES = f"Constants/Constants.Heroes.csv"
-    ITEMS = f"Constants/Constants.ItemIDs.csv"
+    ITEMS = f"Constants/Constants.Items.csv"
     PATCHES = f"Constants/Constants.Patch.csv"
 
     def METADATA(self, x): return f"{x}/main_metadata.csv"
@@ -34,6 +35,7 @@ class OptimizedConfig:
                  duration: tuple[int, int] = (10 * 60, 180 * 60),
                  tier: list[str] = ['professional', 'premium'],
                  years: tuple[int, int] = (2021, 2024),):
+        super().__init__()
         log.separator()
         self.dataset_path = self.try_load_cache(path)
         log.info("Initializing dataset configuration...")
@@ -59,7 +61,8 @@ class OptimizedConfig:
         self._heroes = pl.read_csv(
             os.path.join(self.dataset_path, self.HEROES))
         self._items = pl.read_csv(os.path.join(self.dataset_path, self.ITEMS))
-        self._patches = self.get_patches()
+        self._patches = pl.read_csv(
+            os.path.join(self.dataset_path, self.PATCHES))
         log.info(f"Leagues: {self._leagues.shape}")
         log.info(f"Heroes: {self._heroes.shape}")
         log.info(f"Items: {self._items.shape}")
@@ -119,6 +122,10 @@ class OptimizedConfig:
             hid: i + 1 for i, hid
             in enumerate(self.items_id)}
 
+        self.objetive_type = OptimizedSchema.objectives_types
+        self.objective_team = OptimizedSchema.objectives_teams
+        self.player_team = OptimizedSchema.players_teams
+
     def metadata(self) -> pl.LazyFrame:
         log.separator()
         log.info(
@@ -146,36 +153,20 @@ class OptimizedConfig:
         log.warn(f"Columns lost during metadata loading: {lost}")
         return lf
 
-    def get_patches(self) -> pl.DataFrame:
-        patches = (
-            pl.scan_csv(os.path.join(self.dataset_path, self.PATCHES))
-            .with_row_index()
-        )
-        metadata = self.metadata().drop_nulls(subset=["match_id", "patch"])
-        patch_meta = (
-            metadata.select("match_id", "patch")
-            .group_by("patch")
-            .agg(pl.count("match_id").alias("count"))
-            .with_row_index()
-            .select("index", "patch", "count")
-            .join(other=patches, on="index", how="left")
-        ).collect()
-        log.info(f"Loaded {patch_meta.shape} patches.")
-        log.info(f"Patches: {patch_meta['patch'].unique().to_list()}")
-        return patch_meta
-
     def lazy(self, dataset: str = '') -> pl.LazyFrame:
         log.separator()
-        log.info("Loading dataset as LazyFrame...")
+        log.info(f"Loading {dataset} as LazyFrame...")
         if not os.path.exists(os.path.join(self.dataset_path, dataset)):
-            log.error(f"Dataset file {dataset} does not exist in {self.dataset_path}.")
-            raise FileNotFoundError(f"Dataset file {dataset} does not exist in {self.dataset_path}.")
+            log.error(
+                f"Dataset file {dataset} does not exist in {self.dataset_path}.")
+            raise FileNotFoundError(
+                f"Dataset file {dataset} does not exist in {self.dataset_path}.")
         return pl.scan_csv(os.path.join(self.dataset_path, dataset))
 
     def try_load_cache(self, path: str) -> str:
         if (path == '' or path is None):
             path = os.path.expanduser(
-                f'~/.cache/kagglehub/datasets/{self.dataset_path}/versions/')
+                f'~/.cache/kagglehub/datasets/{self.dataset_name}/versions/')
             if (os.path.exists(path)):
                 log.info(f"Checking cache path: {path}")
                 paths = os.listdir(path)
@@ -191,13 +182,60 @@ class OptimizedConfig:
             path = kagglehub.dataset_download(handle=self.dataset_name,)
         return path
 
+    def _players(self, year: int) -> pl.LazyFrame:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+        return self.lazy(self.PLAYERS(year))
+    
+    def _objectives(self, year: int) -> pl.LazyFrame:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+        return self.lazy(self.OBJECTIVES(year))
+    
+    def _picks_bans(self, year: int) -> pl.LazyFrame:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+        return self.lazy(self.OBJECTIVES(year))
+    
+    def _exp_adv(self, year: int) -> pl.LazyFrame:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+        return self.lazy(self.EXP_ADV(year))
+    
+    def _gold_adv(self, year: int) -> pl.LazyFrame:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+        return self.lazy(self.GOLD_ADV(year))
+    
+    def _team_fights(self, year: int) -> pl.LazyFrame:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.start_year}-{self.end_year}).")
+        return self.lazy(self.TEAM_FIGHTS(year))
 
 class OptimizedDataset:
     def __init__(self, dataset_path: str = ''):
         log.separator()
         log.info("Initializing Dota 2 Dataset...")
 
-        self.config = OptimizedConfig(path=dataset_path)
+        self.config = OptimizedConfig(dataset_path)
         self.config.load()
 
     def get(self, year: int) -> pl.LazyFrame:
@@ -210,8 +248,34 @@ class OptimizedDataset:
         metadata = self.config.metadata()
         return metadata
 
-    # def metadata(self) -> pl.LazyFrame:
-    #     log.separator()
-    #     log.info("Loading metadata...")
-    #     metadata = self.config.metadata()
-    #     leagues = self.config._leagues.join(on="")
+    def players(self, year: int) -> pl.LazyFrame:
+        log.separator()
+        log.info(f"Loading players data for year {year}...")
+
+        if not (self.config.start_year <= year <= self.config.end_year):
+            log.error(
+                f"Year {year} is out of range ({self.config.start_year}-{self.config.end_year}).")
+            raise ValueError(
+                f"Year {year} is out of range ({self.config.start_year}-{self.config.end_year}).")
+
+        players = self.config._players(year)
+        
+        # Cast de string para lista nas colunas do schema que são listas
+        players_schema_dict = OptimizedSchema.players_schema_dict
+        list_columns = [k for k, v in players_schema_dict.items() if isinstance(v, pl.List)]
+
+        for col in list_columns:
+            players = players.with_columns(
+                pl.col(col).map_elements(lambda x: ast.literal_eval(x) if isinstance(x, str) and x != "" else x, return_dtype=pl.List(pl.Float64)).alias(col)
+            )
+
+        # Cast manual para cada coluna
+        players = (
+            players.with_columns([
+            pl.col(col).cast(dtype, strict=False).alias(col)
+            for col, dtype in players_schema_dict.items()
+        ])
+        .select(
+            [pl.col(col) for col in players_schema_dict.keys()]
+        ))
+        return players
