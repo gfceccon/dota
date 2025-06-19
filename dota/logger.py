@@ -168,7 +168,7 @@ class DotaLogger:
         from logging.handlers import RotatingFileHandler
         
         # Ensure log directory exists
-        log_path = Path(log_file)
+        log_path = Path(os.path.join("log", log_file))
         log_path.parent.mkdir(parents=True, exist_ok=True)
         
         file_handler = RotatingFileHandler(
@@ -283,7 +283,7 @@ class DotaLogger:
         else:
             self.info(f"📊 {message}: {current}/{total} ({percentage:.1f}%)")
     
-    def separator(self, title: Optional[str] = None, char: str = "=", length: int = 80):
+    def separator(self, title: Optional[str] = None, char: str = "=", length: int = 40):
         """Log a separator line"""
         if title:
             title_len = len(title)
