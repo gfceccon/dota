@@ -381,6 +381,7 @@ class Dataset:
         self.check_year()
         log.separator()
         log.info(f"Criando metadados...")
+
         metadata = (
             self.config
             .metadata()
@@ -401,7 +402,11 @@ class Dataset:
         self.check_year()
         log.separator()
         log.info(f"Carregando dados dos jogadores...")
-        players = self.config._players(self.year)
+        players = (
+            self.config._players(self.year)
+            .join(self.config._leagues.lazy(), on="leagueid", how="inner")
+            .filter(pl.col("tier").is_in(self.config.tier))
+        )
         # Cast de string para lista nas colunas do schema que são listas
         list_columns = [
             k for k, v in Schema.players_schema.items() if isinstance(v, pl.List)]
