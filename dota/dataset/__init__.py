@@ -1,10 +1,8 @@
-from .dataset import Dataset
-from .optimized import OptimizedConfig, OptimizedDataset
-from .optimized_schema import OptimizedSchema
+from .dataset import Dataset, DatasetHelper
+from .schemas import Schema
 
 __all__ = [
     "Dataset",
-    "OptimizedConfig",
-    "OptimizedDataset",
-    "OptimizedSchema",
+    "DatasetHelper",
+    "Schema",
 ]

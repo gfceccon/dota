@@ -5,19 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cudf-polars-cu12>=25.6.0",
     "hdbscan>=0.8.40",
     "ipywidgets>=8.1.7",
     "jupyterlab>=4.4.3",
     "kagglehub[polars-datasets]>=0.3.12",
-    "kmodes>=0.12.2",
+    "keras>=3.10.0",
     "matplotlib>=3.10.3",
-    "numpy<2.2.0",
-    "pandas>=2.3.0",
-    "polars>=1.30.0",
-    "pyarrow>=20.0.0",
-    "scikit-learn>=1.6.1",
+    "numpy>=2.3.0",
+    "polars>=1.28.1",
+    "pyarrow>=19.0.1",
+    "scikit-learn>=1.7.0",
     "seaborn>=0.13.2",
-    "tensorflow>=2.19.0",
-    "torch>=2.7.0",
-    "torchvision>=0.22.0",
+    "torch>=2.7.1",
 ]

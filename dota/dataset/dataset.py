@@ -1,520 +1,530 @@
 import ast
-import gc
 import os
-from typing import Optional
 import kagglehub
 import polars as pl
-from dota.logger import get_logger
-import dota.dataset.headers as cols
-import dota.dataset.schemas as schema
-import pandas as pd
-import pandas as pd
+from .schemas import Schema
+from dota.logger import LogLevel, get_logger
 
-log = get_logger('dataset')
+log = get_logger(name='dota_dataset',  level=LogLevel.INFO,
+                 log_file='log/dota_dataset.log',)
 
 
-LEAGUES = f"Constants/Constants.Leagues.csv"
-HEROES = f"Constants/Constants.Heroes.csv"
-ITEMS = f"Constants/Constants.ItemIDs.csv"
-ITEMS = f"Constants/Constants.ItemIDs.csv"
-PATCHES = f"Constants/Constants.Patch.csv"
+class DatasetHelper:
+    dataset_name = 'bwandowando/dota-2-pro-league-matches-2023'
+    data_path = '/tmp/dota/dataset/'
+    LEAGUES = f"Constants/Constants.Leagues.csv"
+    HEROES = f"Constants/Constants.Heroes.csv"
+    ITEMS = f"Constants/Constants.Items.csv"
+    PATCHES = f"Constants/Constants.Patch.csv"
 
+    def METADATA(self, x): return f"{x}/main_metadata.csv"
+    def OBJECTIVES(self, x): return f"{x}/objectives.csv"
+    def PICKS_BANS(self, x): return f"{x}/picks_bans.csv"
+    def PLAYERS(self, x): return f"{x}/players.csv"
+    def EXP_ADV(self, x): return f"{x}/radiant_exp_adv.csv"
+    def GOLD_ADV(self, x): return f"{x}/radiant_gold_adv.csv"
+    def TEAM_FIGHTS(self, x): return f"{x}/teamfights.csv"
 
-def METADATA(x): return f"{x}/main_metadata.csv"
-def OBJECTIVES(x): return f"{x}/objectives.csv"
-def PICKS_BANS(x): return f"{x}/picks_bans.csv"
-def PLAYERS(x): return f"{x}/players.csv"
-def EXP_ADV(x): return f"{x}/radiant_exp_adv.csv"
-def GOLD_ADV(x): return f"{x}/radiant_gold_adv.csv"
-def TEAM_FIGHTS(x): return f"{x}/teamfights.csv"
-
-
-class Dataset:
+    _leagues: pl.DataFrame
+    _heroes_data: pl.DataFrame
+    _items: pl.DataFrame
+    _patches: pl.DataFrame
 
     def __init__(self,
-                 duration: tuple[int, int] = (10 * 60, 150 * 60),
+                 path: str = '',
+                 duration: tuple[int, int] = (10 * 60, 180 * 60),
                  tier: list[str] = ['professional', 'premium'],
-                 years: tuple[int, int] = (2021, 2025)):
-        self.data_path = "dota2_data"
-        self.dataset_name = "bwandowando/dota-2-pro-league-matches-2023"
-        
-        self.dataset_version = "181"
-        self.path = f"~/.cache/kagglehub/datasets/{self.dataset_name}/versions/{self.dataset_version}/"
-        if(not os.path.exists(self.path)):
-            self.path = kagglehub.dataset_download(self.dataset_name)
-            print(f"Dataset downloaded to {self.path}")
-
-        self.years = years
+                 years: tuple[int, int] = (2021, 2024),):
+        super().__init__()
+        log.separator()
+        self.dataset_path = self.try_load_cache(path)
+        log.info("Inicializando configuração do dataset...")
+        log.info(f"Nome do dataset: {self.dataset_name}")
+        log.info(f"Caminho do dataset: {self.dataset_path}")
+        log.info(f"Caminho dos dados: {self.data_path}")
+        os.makedirs(self.data_path, exist_ok=True)
+        self.start_year, self.end_year = years
         self.duration = duration
         self.tier = tier
 
-        _all_heroes = self._get_lf(HEROES, cols.heroes)
-        self.attributes = (
-            _all_heroes.select(pl.col("primary_attr")).unique()
-            .collect().to_dict(as_series=False)["primary_attr"]
+    def load(self) -> None:
+        self.load_constants()
+        self.load_constants_ids()
+        self.load_mappings()
+
+    def load_constants(self):
+        log.separator()
+        log.info("Carregando constantes...")
+        self._leagues = pl.read_csv(
+            os.path.join(self.dataset_path, self.LEAGUES))
+        self._heroes_data = pl.read_csv(
+            os.path.join(self.dataset_path, self.HEROES))
+        self._items = pl.read_csv(
+            os.path.join(self.dataset_path, self.ITEMS))
+        self._patches = (
+            pl.
+            read_csv(
+                os.path.join(self.dataset_path, self.PATCHES))
+            .with_columns(
+                pl.col("patch").alias("patch_version"),
+                pl.col("date").cast(pl.Datetime).alias("patch_date"),)
+            .drop("patch", "date")
         )
-        self.dict_attributes = {attr: i + 1 for i,
-                                attr in enumerate(self.attributes)}
-        self.dict_attack = {
-            "Melee": 1,
-            "Ranged": 2,
-            "Unknown": 0
-        }
+
+        log.info(f"Ligas: {self._leagues.shape}")
+        log.info(f"Heróis: {self._heroes_data.shape}")
+        log.info(f"Itens: {self._items.shape}")
+        log.info(f"Patches: {self._patches.shape}")
+
+    def load_constants_ids(self) -> None:
+        log.separator()
+        log.info("Carregando IDs das constantes...")
+
+        self.attrs = (
+            self._heroes_data.select(pl.col("primary_attr"))
+            .unique().to_dict(as_series=False)["primary_attr"])
 
         self.roles: list[str] = list({
             role for roles_list in
-            _all_heroes.select("roles")
-            .collect().to_series().to_list()
+            self._heroes_data.select("roles")
+            .to_series().to_list()
             for role
             in (ast.literal_eval(roles_list)
                 if isinstance(roles_list, str) else roles_list)
         })
 
-        self.dict_roles = {role: i + 1 for i, role in enumerate(self.roles)}
+        self.heroes_ids = (
+            self._heroes_data.select(pl.col("id"))
+            .unique().sort("id")
+            .to_series().to_list())
 
-        self.hero_ids = _all_heroes.select(pl.col("id")).unique().sort(
-            "id").collect().to_series().to_list()
-        self.dict_hero_index = {hid: i for i, hid in enumerate(self.hero_ids)}
+        self.items_id = (
+            self._items.select(pl.col("id"))
+            .unique().sort("id")
+            .to_series().to_list())
 
-        _all_items = self._get_lf(ITEMS, cols.items)
-        self.items_id = _all_items.select(pl.col("id")).unique().sort(
-            "id").collect().to_series().to_list()
-        self.dict_items_index = {hid: i + 1 for i,
-                                 hid in enumerate(self.items_id)}
+    def load_mappings(self) -> None:
+        log.separator()
+        log.info("Carregando mapeamentos de IDs...")
 
-        self.heroes = self._heroes()
-        self.patches = self._patches()
-        self.metadata = self._metadata()
-        self.leagues = self._leagues()
-        self.items = self._items()
+        self.attack_mapping = {
+            "Melee": 1,
+            "Ranged": 2,
+            "Unknown": 0
+        }
 
-        _all_items = self._get_lf(ITEMS, cols.items)
-        self.items_id = _all_items.select(pl.col("id")).unique().sort(
-            "id").collect().to_series().to_list()
-        self.dict_items_index = {hid: i for i, hid in enumerate(self.items_id)}
+        self.attr_mapping = {
+            attr: i + 1 for i, attr
+            in enumerate(self.attrs)}
 
-    def get_heroes_usage(self, year: int) -> pl.LazyFrame:
-        picks_bans = self._picks_bans(year).with_columns(
-            pl.col("hero_id").cast(pl.Int32).alias("hero_id"))
-        lf = (
-            self
-            ._metadata()
-            .join(self.patches, on="patch", how="inner")
-            .filter(pl.col("date").cast(pl.Datetime).dt.year().eq(year))
-            .join(self.leagues, on="leagueid", how="inner")
-            .join(picks_bans, on="match_id", how="inner")
-            .join(self.heroes, on="hero_id", how="inner")
-            .select(
-                [
-                    pl.col("leaguename").alias("league_name"),
-                    pl.col("leagueid").alias("league_id"),
-                    pl.col("is_pick").alias("pick"),
-                    pl.col("patch"),
-                    pl.col("date"),
-                    pl.col("tier"),
-                    pl.col("hero_id"),
-                    pl.col("hero_name"),
-                ]
-            )
-        )
+        self.role_mapping = {
+            role: i + 1 for i, role
+            in enumerate(self.roles)}
 
-        return lf
+        self.hero_mapping = {
+            hid: i + 1 for i, hid
+            in enumerate(self.heroes_ids)}
 
-    def get_year(self, year: int) -> pl.LazyFrame:
-        if (self.years[0] > year or self.years[1] <= year):
-            raise ValueError(f"Year {year} is not in the range {self.years}")
-        metadata = (
-            self
-            ._get_lf(METADATA(str(year)), cols.metadata)
-            .filter(pl.col("duration").is_between(self.duration[0], self.duration[1]))
-        )
-        objectives = self._objectives(year)
-        games = self._games(year)
-        exp_adv = self._exp_adv(year)
-        gold_adv = self._gold_adv(year)
-        # Dados de team_fights ainda não estão sendo utilizados
-        # team_fights = self._team_fights(year)
+        self.item_mapping = {
+            hid: i + 1 for i, hid
+            in enumerate(self.items_id)}
 
-        self.data = (
-            metadata
-            .join(self.patches, on="patch", how="inner")
-            .join(self.leagues, on="leagueid", how="inner")
-            .join(games, on=["match_id"], how="inner")
-            .join(self.heroes, on="hero_id", how="inner")
-            .with_columns(
-                # Players Stats
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True))
-                .then(
-                    pl.concat_list(
-                        pl.when(pl.col(x).is_not_null())
-                        .then(pl.col(x))
-                        .otherwise(pl.lit(0))
-                        for x in cols.players_stats_single
-                    ).alias("player_radiant_stats")
-                ),
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True))
-                .then(
-                    pl.concat_list(
-                        pl.when(pl.col(x).is_not_null())
-                        .then(pl.col(x))
-                        .otherwise(pl.lit(0))
-                        for x in cols.players_stats_single
-                    ).alias("player_dire_stats")
-                ),
+        self.objetive_type = Schema.objectives_types
+        self.objective_team = Schema.objectives_teams
+        self.player_team = Schema.players_teams
 
-                # Items
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("items_vector")).alias("radiant_items"),
+    def metadata(self) -> pl.LazyFrame:
+        log.separator()
+        log.info(
+            f"Carregando metadados de {self.start_year} até {self.end_year}...")
 
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("items_vector")).alias("dire_items"),
-
-                # Backpack
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("backpack_vector")).alias("radiant_backpack"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("backpack_vector")).alias("dire_backpack"),
-            )
-            .group_by(["match_id"])
-            .agg([
-                pl.all().exclude(*["count", *cols.patches, *
-                                   cols.leagues, *cols.heroes, *cols.metadata]),
-
-                *[pl.col(_col).first() for _col in
-                  set(col for col in [*cols.patches, *cols.leagues, *cols.metadata] if col not in ["match_id",])],
-
-                # Picks and Bans
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_idx")).drop_nulls().alias("radiant_picks"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_idx")).drop_nulls().alias("dire_picks"),
-
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_idx")).drop_nulls().alias("radiant_bans"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_idx")).drop_nulls().alias("dire_bans"),
-
-                # Hero Attributes
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("primary_attribute")).alias("radiant_attributes"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("primary_attribute")).alias("dire_attributes"),
-
-                # Hero Attack type
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("attack")).alias("radiant_attack"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("attack")).alias("dire_attack"),
-
-                # Hero Roles
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("roles_vector")).alias("radiant_roles_picks"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("roles_vector")).alias("dire_roles_picks"),
-
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
-                    pl.col("roles_vector")).alias("radiant_roles_bans"),
-
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
-                    pl.col("roles_vector")).alias("dire_roles_bans"),
-
-            ])
-            .join(objectives, on="match_id", how="inner")
-            .join(exp_adv, on="match_id", how="inner")
-            .join(gold_adv, on="match_id", how="inner")
-            .filter(
-                (pl.col("radiant_picks").list.len() == 5) &
-                (pl.col("dire_picks").list.len() == 5) &
-
-                (pl.col("radiant_bans").list.len() == 7) &
-                (pl.col("dire_bans").list.len() == 7)
-            )
-            .with_columns(
-                *[
-                    pl.col(col).str.to_decimal().alias(col)
-                    for col in ["series_type", "series_id", "region"]
-                    if isinstance(pl.col(col), pl.String)]
-            )
-            .with_columns(
-                *[pl.col(col).cast(cast, strict=False).alias(col)
-                  for col, cast
-                  in schema.target_dataset.items()]
-            )
-            .select(
-                *[
-                    pl.col({col}).list.drop_nulls()
-                    for col in schema.target_dataset.names()
-                    if schema.target_dataset[col].is_nested()
-                ],
-                *[
-                    pl.col({col})
-                    for col in schema.target_dataset.names()
-                    if not schema.target_dataset[col].is_nested()
-                ],
-            )
-        )
-
-        return self.data
-
-    def _patches(self) -> pl.LazyFrame:
-        patch_count: dict[int, tuple[str, str, int]] = {}
-        patches_detail = self._get_lf(PATCHES, cols.patches).collect()
-        meta = self._metadata().drop_nans("match_id")
-        patch_meta = (
-            meta.select("match_id", "patch")
-            .group_by("patch")
-            .agg(pl.count("match_id").alias("count"))
-            .select("patch", "count").collect()
-        )
-        for row in patch_meta.iter_rows(named=True):
-            patch = row["patch"]
-            count = row["count"]
-            patch_name = patches_detail.item(patch - 1, 0)
-            patch_date = patches_detail.item(patch - 1, 1)
-            patch_count[patch] = (patch_name, patch_date, count)
-        return pl.LazyFrame(
-            {
-                "patch": list(patch_count.keys()),
-                "name": [x[0] for x in patch_count.values()],
-                "date": [x[1] for x in patch_count.values()],
-                "count": [x[2] for x in patch_count.values()],
-            }
-        )
-
-    def _leagues(self) -> pl.LazyFrame:
-        leagues = (
-            self._get_lf(LEAGUES, cols.leagues)
-            .filter(pl.col("tier").is_in(self.tier))
-        )
-        return leagues
-
-    def _heroes(self, ):
-        heroes = (
-            self._get_lf(HEROES, cols.heroes)
-            .with_columns(
-                pl.col("primary_attr")
-                .replace(self.dict_attributes,
-                         return_dtype=pl.Int32).alias("primary_attribute"),
-                pl.col("roles").map_elements(
-                    lambda x: [
-                        self.dict_roles.get(y) for y in ast.literal_eval(x)]
-                    if isinstance(x, str) else x,
-                    return_dtype=pl.List(pl.Int32)
-                ).replace(self.dict_roles).alias("roles_vector"),
-                pl.col("id")
-                .cast(pl.Int32)
-                .alias("hero_id"),
-
-                pl.col("id")
-                .replace(self.dict_hero_index, return_dtype=pl.Int32)
-                .alias("hero_idx"),
-
-                pl.col("attack_type")
-                .replace(self.dict_attack,
-                         return_dtype=pl.Int32).alias("attack"),
-
-                pl.col("localized_name").alias("hero_name"),
-            )
-        )
-
-        size_roles = len(self.dict_roles)
-        _heroes = heroes.collect()
-        rows = []
-        for h in _heroes.iter_rows(named=True):
-            l = len(h["roles_vector"])
-            h["roles_vector"] = sorted(
-                h["roles_vector"] + [0] * (size_roles - l))
-            rows.append(h)
-        new_heroes = pl.DataFrame(rows, schema=_heroes.schema)
-
-        return new_heroes.lazy()
-
-    def _items(self) -> pl.LazyFrame:
-        items = (
-            self._get_lf(ITEMS, cols.items)
-            .with_columns(
-                pl.col("id").cast(pl.Int32).alias("id"),
-                pl.col("id").replace(self.dict_items_index).cast(
-                    pl.Int32).alias("item_id"),
-                pl.col("name"),
-            )
-        )
-        return items
-
-    def _picks_bans(self, year: int) -> pl.LazyFrame:
-        picks_bans = self._get_lf(PICKS_BANS(str(year)), cols.picks_bans)
-        picks = (
-            picks_bans
-            .select(
-                [
-                    pl.col("team"),
-                    pl.col("match_id"),
-                    pl.col("is_pick"),
-                    pl.col("hero_id")
-                    .cast(pl.Int32)
-                ]
-            )
-        )
-        return picks
-
-    def _objectives(self, year: int) -> pl.LazyFrame:
-        obj = self._get_lf(OBJECTIVES(str(year)), cols.objectives)
-
-        objectives = (
-            obj
-            .with_columns([
-                pl.col("type")
-                .replace(cols.objectives_type)
-            ])
-            .group_by(["match_id"])
-            .agg(
-                pl.concat_list([
-                    pl.col(f"{col}")
-                    .drop_nulls()
-                    for col in cols.objectives if col not in ["match_id"]
-                ]).alias("objectives")
-            )
-        )
-        return objectives
-
-    def _games(self, year: int) -> pl.LazyFrame:
-        players = self._get_lf(PLAYERS(str(year)), cols.players)
-
-        players = (
-            players
-            .with_columns(
-                pl.col("hero_id").cast(pl.Int32).alias("hero_id"),
-                pl.col("account_id").cast(pl.Int32).alias("account_id"),
-
-                pl.when(pl.col("purchase_gem") == "")
-                .then(pl.lit(0))
-                .otherwise(pl.col("purchase_gem").str.to_decimal())
-                .cast(pl.Int32)
-                .alias("purchase_gem"),
-
-                pl.when(pl.col("purchase_rapier") == "")
-                .then(pl.lit(0))
-                .otherwise(pl.col("purchase_rapier").str.to_decimal())
-                .cast(pl.Int32)
-                .alias("purchase_rapier"),
-
-                *[pl.col({col}).str
-                  .extract_all(r"(\d+)")
-                  .list.eval(pl.element().cast(pl.Int32))
-                  .alias(f"{col}") for col in cols.players_stats_list],
-
-                *[pl.col(f"item_{x}").replace(self.dict_items_index).alias(f"item_{x}_idx")
-                  for x in range(0, 6)],
-
-                *[pl.col(f"backpack_{x}").replace(self.dict_items_index).alias(
-                    f"backpack_{x}_idx") for x in range(0, 3)],
-            )
-            .with_columns(
-                pl.concat([
-                    pl.col(f"item_{x}_idx")
-                    for x in range(0, 6)
-                ]).alias("items_vector"),
-
-                pl.concat([
-                    pl.col(f"backpack_{x}_idx")
-                    for x in range(0, 3)
-                ]).alias("backpack_vector"),
-            )
-            .join(self._picks_bans(year), on=["match_id", "hero_id"], how="right")
-        )
-
-        return players
-
-    def _exp_adv(self, year: int) -> pl.LazyFrame:
-        return self._get_lf(EXP_ADV(str(year)), cols.exp_adv).select(pl.col("exp").alias("exp_adv"), pl.col("match_id")).group_by("match_id").agg(pl.all())
-
-    def _gold_adv(self, year: int) -> pl.LazyFrame:
-        return self._get_lf(GOLD_ADV(str(year)), cols.gold_adv).select(pl.col("gold").alias("gold_adv"), pl.col("match_id")).group_by("match_id").agg(pl.all())
-
-    def _team_fights(self, year: int) -> pl.LazyFrame:
-        return self._get_lf(TEAM_FIGHTS(str(year)), cols.team_fights).group_by("match_id").agg(pl.all())
-
-    def _metadata(self) -> pl.LazyFrame:
-        files = [METADATA(str(year))
-                 for year in range(self.years[0], self.years[1])]
-        lf, lost = self._get_all_lf(*files)
-        lf = lf.match_to_schema(
-            schema=schema.metadata_schema, extra_columns='ignore')
-        log.debug(f"Difference in metadata columns: {lost}")
-        return lf
-
-    def _get_all_lf(self, *files: str) -> tuple[pl.LazyFrame, list[str]]:
         scans: list[pl.LazyFrame] = []
         schemas: list[pl.Schema] = []
+        files = [self.METADATA(year) for year
+                 in range(self.start_year, self.end_year + 1)]
+
         for file in files:
-            _lf = pl.scan_csv(f"{self.path}/{file}")
+            _lf = pl.scan_csv(f"{self.dataset_path}/{file}")
             scans.append(_lf)
             schemas.append(_lf.collect_schema())
+
         names = set(schemas[0].names())
         lost = []
 
         for schema in schemas:
             names.intersection_update(schema.names())
             lost.extend(set(schema.names()) - names)
-        lf = pl.concat(scans, how="diagonal_relaxed").lazy()
-        return lf, lost
 
-    def _get_lf(self, file: str, columns: list[str]) -> pl.LazyFrame:
-        lf = pl.scan_csv(f"{self.path}/{file}")
-        lf = (
-            lf.select(_col for _col in columns)
-        )
-        return lf
+        log.warn(
+            f"Colunas perdidas durante o carregamento dos metadados: {set(lost)}")
+        return pl.concat(scans, how="diagonal_relaxed")
 
-    def save_dataset(self, year: int) -> pl.DataFrame:
-        path = f"{self.data_path}/{year}"
-        os.makedirs(path, exist_ok=True)
-
-        df = self.get_year(year).collect()
-        ti = df.filter(pl.col("leaguename").str.starts_with(
-            f"The International {year}"))
-        with open(f"{path}/dataset_schema.txt", "w") as f:
-            f.write(str(df.collect_schema()))
-        df.write_json(f"{path}/dataset.json")
-        ti.write_json(f"{path}/ti.json")
-
-        df = df.sample(fraction=1, seed=42, shuffle=True,
-                       with_replacement=True)  # Shuffle the DataFrame
-        train_df = df.sample(fraction=0.7, seed=42)
-        val_df = df.sample(fraction=0.15, seed=42)
-        test_df = df.sample(fraction=0.15, seed=42)
-
-        train_pd = train_df.to_pandas()
-        val_pd = val_df.to_pandas()
-        test_pd = test_df.to_pandas()
-
-        train_pd.to_json(f"{path}/train.json", orient='records', lines=True)
-        val_pd.to_json(f"{path}/val.json", orient='records', lines=True)
-        test_pd.to_json(f"{path}/test.json", orient='records', lines=True)
-
+    def lazy(self, dataset: str = '') -> pl.LazyFrame:
         log.separator()
-        log.info(f"Dataset for year {year} saved at {path}/dataset.json")
-        log.info(f"Dataset shape: {df.shape}")
-        log.info(f"Train set saved at {path}/train.csv")
-        log.info(f"Validation set saved at {path}/val.csv")
-        log.info(f"Test set saved at {path}/test.csv")
-        log.separator()
-
-        return df
-
-    @staticmethod
-    def load_json(path: str, year: int) -> pd.DataFrame:
-        if not (2021 <= year < 2025):
-            raise ValueError("Year must be between 2021 and 2024")
-        _path = f"{path}/dota2_data/{year}/dataset.json"
-        if not os.path.exists(_path):
+        log.info(f"Carregando {os.path.join(self.dataset_path, dataset)}...")
+        if not os.path.exists(os.path.join(self.dataset_path, dataset)):
+            log.error(
+                f"Arquivo do dataset {dataset} não existe em {self.dataset_path}.")
             raise FileNotFoundError(
-                f"Dataset for year {year} not found at {_path}")
-        json = pd.read_json(_path, orient='records', lines=True)
-        return json
+                f"Arquivo do dataset {dataset} não existe em {self.dataset_path}.")
+        return pl.scan_csv(os.path.join(self.dataset_path, dataset))
+
+    def try_load_cache(self, path: str) -> str:
+        if (path == '' or path is None):
+            path = os.path.expanduser(
+                f'~/.cache/kagglehub/datasets/{self.dataset_name}/versions/')
+            if (os.path.exists(path)):
+                log.info(f"Verificando caminho do cache: {path}")
+                paths = os.listdir(path)
+                if (len(paths) > 0):
+                    latest = max(paths)
+                    path = os.path.join(path, latest)
+                    log.info(
+                        f"Caminho do dataset encontrado no cache: {path}")
+                else:
+                    log.error(
+                        "Caminho do dataset não foi fornecido e não pode ser encontrado no KaggleHub.")
+                    path = ''
+        if (path == '' or path is None):
+            path = kagglehub.dataset_download(handle=self.dataset_name,)
+        return path
+
+    def _players(self, year: int) -> pl.LazyFrame:
+        self.check_year(year)
+        return self.lazy(self.PLAYERS(year))
+
+    def _objectives(self, year: int) -> pl.LazyFrame:
+        self.check_year(year)
+        return (
+            self.lazy(self.OBJECTIVES(year))
+            .with_columns(
+                pl.col("type")
+                .replace(self.objetive_type)
+                .alias("type"),
+                pl.when(pl.col("team") != "")
+                .then(
+                    pl.col("team")
+                    .replace(self.objective_team))
+                .alias("team")
+            ))
+
+    def _picks_bans(self, year: int) -> pl.LazyFrame:
+        self.check_year(year)
+        return (
+            self.lazy(self.PICKS_BANS(year))
+            .with_columns(
+                pl.col("hero_id")
+                .cast(pl.Float64, strict=False)
+                .replace(self.hero_mapping)
+                .alias("hero_id"),
+            ))
+
+    def _exp_adv(self, year: int) -> pl.LazyFrame:
+        self.check_year(year)
+        return self.lazy(self.EXP_ADV(year))
+
+    def _gold_adv(self, year: int) -> pl.LazyFrame:
+        self.check_year(year)
+        return self.lazy(self.GOLD_ADV(year))
+
+    def _team_fights(self, year: int) -> pl.LazyFrame:
+        self.check_year(year)
+        return self.lazy(self.TEAM_FIGHTS(year))
+
+    def _heroes(self) -> pl.LazyFrame:
+        log.separator()
+        log.info("Carregando dados dos heróis...")
+        heroes = (
+            self._heroes_data
+            .with_columns(
+                pl.col("roles")
+                .map_elements(
+                    lambda x: ast.literal_eval(x)
+                    if isinstance(x, str) and x != "" else x,
+                    return_dtype=pl.List(pl.String))
+                .alias("roles")
+            )
+            .with_columns([
+                pl.col("id")
+                .replace(self.hero_mapping)
+                .cast(pl.Float64, strict=False)
+                .alias("hero_id"),
+
+                pl.col("localized_name")
+                .alias("hero_name"),
+
+                pl.col("primary_attr")
+                .replace(self.attr_mapping)
+                .cast(pl.Int64)
+                .alias("primary_attribute"),
+
+                pl.col("roles").list
+                .eval(
+                    pl.element()
+                    .replace(self.role_mapping)
+                )
+                .cast(pl.List(pl.Int64))
+                .alias("roles_vector"),
+
+                pl.col("attack_type")
+                .replace(self.attack_mapping)
+                .cast(pl.Int64)
+                .alias("attack_type"),
+
+                *[pl.col(k).cast(v, strict=False).alias(k)
+                  for k, v in Schema.heroes_schema.items()]
+            ])
+        )
+        size = len(self.role_mapping)
+        rows = []
+        for h in heroes.iter_rows(named=True):
+            l = len(h["roles_vector"])
+            h["roles_vector"] = sorted(h["roles_vector"] + [0] * (size - l))
+            rows.append(h)
+        return pl.LazyFrame(rows).select(Schema.heroes_parsed_schema.keys())
+
+    def check_year(self, year: int) -> None:
+        if not (self.start_year <= year <= self.end_year):
+            log.error(
+                f"Ano {year} está fora do intervalo ({self.start_year}-{self.end_year}).")
+            raise ValueError(
+                f"Ano {year} está fora do intervalo ({self.start_year}-{self.end_year}).")
+
+
+class Dataset:
+    def __init__(self, year: int, path: str = ''):
+        """
+        Inicializa o dataset otimizado do Dota 2.
+        :param dataset_path: Caminho para o dataset (opcional).
+        :param default_year: Ano padrão para carregamento dos dados.
+        """
+        log.separator()
+        log.info("Inicializando Dataset Dota 2...")
+
+        self.config = DatasetHelper(path)
+        self.cache_path = None
+        self.year = year
+        self.check_year()
+        self.config.load()
+
+    def get(self) -> pl.LazyFrame:
+        """
+        Carrega e processa os dados do ano especificado, gera o cache ao final e retorna o dado principal como LazyFrame.
+        Se o cache já existir, utiliza o cache.
+        :param year: Ano dos dados a serem carregados.
+        :return: LazyFrame com os dados principais.
+        """
+        self.check_year()
+        cache_dir = f"tmp/cache/dota2_{self.year}"
+        data_parquet_path = os.path.join(cache_dir, "data.parquet")
+        if os.path.exists(data_parquet_path):
+            log.info(
+                f"Cache encontrado para o ano {self.year}, carregando do cache...")
+            return self.load_cache(cache_dir)
+        log.info(
+            f"Cache não encontrado para o ano {self.year}, processando dados...")
+        os.makedirs(cache_dir, exist_ok=True)
+        # Carrega e processa os dados principais
+        metadata = self.metadata()
+        players = self.players()
+        heroes = self.config._heroes()
+        objectives = self.config._objectives(self.year)
+        # Salva arquivos auxiliares
+        log.info("Salvando arquivos auxiliares em Parquet...")
+        heroes.collect().write_parquet(os.path.join(cache_dir, 'heroes.parquet'))
+        objectives.collect().write_parquet(os.path.join(cache_dir, 'objectives.parquet'))
+        log.info("Salvando metadata em Parquet...")
+        metadata.collect(engine='gpu').write_parquet(
+            os.path.join(cache_dir, 'metadata.parquet'))
+        log.info("Salvando player em Parquet...")
+        players.collect(engine='gpu').write_parquet(
+            os.path.join(cache_dir, 'players.parquet'))
+        # Gera o dado principal
+        player_aggregate = [pl.col(col).alias(
+            col) for col in Schema.players_parsed_schema.keys() if col != "match_id"]
+        meta_aggregate = [pl.col(col).first().alias(
+            col) for col in Schema.metadata_parsed_schema.keys() if col != "match_id"]
+        heroes_aggregate = [pl.col(col).first().alias(
+            col) for col in Schema.heroes_parsed_schema.keys() if col != "hero_id"]
+        data = (
+            metadata
+            .join(players, on="match_id", how="inner")
+            .group_by("match_id")
+            .agg(*player_aggregate, *meta_aggregate, *heroes_aggregate)
+        )
+        log.info("Salvando arquivo principal em Parquet...")
+        data.collect(engine='gpu').write_parquet(data_parquet_path)
+        log.info(f"Cache salvo em {cache_dir}")
+        return pl.scan_parquet(data_parquet_path)
+
+    def load_cache(self, path: str) -> pl.LazyFrame:
+        """
+        Carrega o cache salvo no diretório especificado e retorna o dado principal como LazyFrame.
+        O arquivo principal deve ser 'data.parquet' no formato parquet.
+        :param path: Caminho do diretório do cache.
+        :return: LazyFrame com os dados principais.
+        """
+        data_parquet_path = os.path.join(path, "data.parquet")
+        if not os.path.exists(data_parquet_path):
+            log.error(
+                f"Arquivo de cache principal não encontrado em {data_parquet_path}")
+            raise FileNotFoundError(
+                f"Arquivo de cache principal não encontrado em {data_parquet_path}")
+        log.info(f"Carregando cache principal de {data_parquet_path}")
+        return pl.scan_parquet(data_parquet_path)
+
+    def metadata(self) -> pl.LazyFrame:
+        """
+        Cria e retorna os metadados do dataset, realizando joins e filtros necessários.
+        :return: LazyFrame com os metadados processados.
+        """
+        self.check_year()
+        log.separator()
+        log.info(f"Criando metadados...")
+        metadata = (
+            self.config
+            .metadata()
+            .join(self.config._leagues.lazy(), on="leagueid", how="inner")
+            .filter(pl.col("tier").is_in(self.config.tier))
+            .join(self.gold(), on="match_id",)
+            .join(self.exp(), on="match_id",)
+            .unique(subset=["match_id"])
+            .select(Schema.metadata_parsed_schema.keys())
+        )
+        return metadata
+
+    def players(self) -> pl.LazyFrame:
+        """
+        Carrega e processa os dados dos jogadores, realizando casts e joins necessários.
+        :return: LazyFrame com os dados dos jogadores processados.
+        """
+        self.check_year()
+        log.separator()
+        log.info(f"Carregando dados dos jogadores...")
+        players = self.config._players(self.year)
+        # Cast de string para lista nas colunas do schema que são listas
+        list_columns = [
+            k for k, v in Schema.players_schema.items() if isinstance(v, pl.List)]
+        for col in list_columns:
+            players = players.with_columns(
+                pl.col(col).map_elements(
+                    lambda x: ast.literal_eval(x) if isinstance(
+                        x, str) and x != "" else x,
+                    return_dtype=pl.List(pl.Float64)
+                ).alias(col)
+            )
+        # Cast manual para cada coluna
+        players = (
+            players
+            .with_columns(
+                *[pl.col(col).cast(dtype, strict=False).alias(col)
+                  for col, dtype in Schema.players_schema.items()],
+            )
+            .with_columns(
+                pl.col("hero_id")
+                .cast(pl.Float64, strict=False)
+                .replace(self.config.hero_mapping)
+                .alias("hero_id"),
+            )
+            .join(self.config._heroes(), on="hero_id", how="inner")
+            .join(
+                self.config._picks_bans(self.year),
+                on=["match_id", "hero_id"],
+                how="right"
+            )
+        )
+
+        select_columns: list[str] = [*[col for col in Schema.players_parsed_schema.keys(
+        )], *[col for col in Schema.heroes_parsed_schema.keys() if col not in ["hero_id"]]]
+
+        players = (
+            self.items_backpack(players)
+            .select(select_columns)
+        )
+        return players
+
+    def gold(self) -> pl.LazyFrame:
+        self.check_year()
+        log.separator()
+        log.info(f"Carregando dados de vantagem de ouro...")
+        self.check_year()
+
+        gold_adv = (
+            self.config
+            ._gold_adv(self.year)
+            .sort("minute", descending=False)
+            .group_by("match_id", maintain_order=True)
+            .agg(pl.col("gold").alias("gold_adv"))
+        )
+
+        return gold_adv
+
+    def exp(self) -> pl.LazyFrame:
+        self.check_year()
+        log.separator()
+        log.info(f"Carregando dados de vantagem de experiência...")
+        self.check_year()
+
+        exp_adv = (
+            self.config
+            ._exp_adv(self.year)
+            .sort("minute", descending=False)
+            .group_by("match_id", maintain_order=True)
+            .agg(pl.col("exp").alias("exp_adv"))
+        )
+
+        return exp_adv
+
+    def items_backpack(self, data: pl.LazyFrame) -> pl.LazyFrame:
+        self.check_year()
+        log.separator()
+        log.info(f"Processando itens e mochila dos jogadores...")
+        data = (
+            data.with_columns([
+                *[
+                    pl.col(f"item_{x}")
+                    .replace(self.config.item_mapping)
+                    .alias(f"item_{x}_idx")
+                    for x in range(0, 6)
+                ],
+
+                *[
+                    pl.col(f"backpack_{x}")
+                    .replace(self.config.item_mapping)
+                    .alias(f"backpack_{x}_idx")
+                    for x in range(0, 3)],
+            ])
+            .with_columns([
+                pl.concat_list([
+                    pl.col(f"item_{x}_idx")
+                    for x in range(0, 6)
+                ])
+                .alias("items_vector"),
+
+                pl.concat_list([
+                    pl.col(f"backpack_{x}_idx")
+                    for x in range(0, 3)
+                ])
+                .alias("backpack_vector"),
+            ])
+            .drop([
+                f"item_{x}"
+                for x in range(0, 6)
+            ])
+            .drop([
+                f"item_{x}_idx"
+                for x in range(0, 6)
+            ])
+            .drop([
+                f"backpack_{x}"
+                for x in range(0, 3)
+            ])
+            .drop([
+                f"backpack_{x}_idx"
+                for x in range(0, 3)
+            ])
+        )
+        return data
+
+    def check_year(self) -> None:
+        self.config.check_year(self.year)
