@@ -1,19 +1,20 @@
-from .dota import Dota2
-from .dataset import Dataset, DatasetHelper, Schema
-from .logger import get_logger
-from .plot import plotter, plotter_3col
-from .ai import Dota2AE, Dota2Cluster
+# dota package initialization
 
+__version__ = "0.1.0"
+
+from .dota import Dota2
+from .dataset import Dataset, DatasetHelper
+from .logger import get_logger
+from .autoencoder import Dota2AE
+from .cluster import Dota2Cluster
+from .keras_ae import Dota2AEKeras
 
 __all__ = [
     "Dota2",
     "Dataset",
-    "get_logger",
-    "plotter",
-    "plotter_3col",
-    "Dota2AE",
-    "Dataset",
     "DatasetHelper",
-    "Schema",
+    "get_logger",
+    "Dota2AE",
     "Dota2Cluster",
+    "Dota2AEKeras"
 ]

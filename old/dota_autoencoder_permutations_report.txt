@@ -1,9 +1,0 @@
-Dota2 Autoencoder Permutation Results
-========================================
-Best permutation: 0_001_0_3_256__128__64__32_8_4_3
-Loss: 0.000003
-Accuracy: 1.0
-Avg MSE: 1.2195e-7
-Stopped at: 60
-Model path: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_0_001_0_3_256__128__64__32_8_4_3.h5
-Loss path: ./tmp/8a79ab390b8572cdbb26f5921dc154c1a191f7bcebe70352b72f7d2b2b1989a1/dota_autoencoder_loss_0_001_0_3_256__128__64__32_8_4_3.csv

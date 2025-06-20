@@ -1,16 +1,8 @@
 import os
-from dota.ai.autoencoder import Dota2AE
-from dota.ai.cluster import Dota2Cluster
+from dota.autoencoder import Dota2AE
+from dota.cluster import Dota2Cluster
 from dota.logger import get_logger
-from dota.dataset.dataset import Dataset
-import numpy as np
-import pandas as pd
-
-os.makedirs("log", exist_ok=True)
-os.makedirs("tmp", exist_ok=True)
-os.makedirs("loss_history", exist_ok=True)
-os.makedirs("reports", exist_ok=True)
-os.makedirs("best", exist_ok=True)
+from dota.dataset import Dataset
 
 log = get_logger("Dota2")
 
@@ -116,7 +108,7 @@ class Dota2():
 
     def __init__(self, year: int):
         ds = Dataset(year)
-        self._dataset = ds
+        self.dataset = ds
 
         self.emb_attr = ds.config.attr_mapping
         self.emb_role = ds.config.role_mapping
@@ -190,7 +182,7 @@ class Dota2():
         log.info(f"Learning Rate: {self.lr}")
         log.info(f"Epochs: {self.epochs}")
         log.info(f"Patience: {self.patience}")
-        log.info(f"Path: {self._dataset.cache_path}")
+        log.info(f"Cache Path: {self.dataset.cache_path}")
         log.info(f"Radiant Picks Embedding: {self.emb_pick_dim}")
         log.info(f"Dire Picks Embedding: {self.emb_pick_dim}")
         log.info(f"Radiant Bans Embedding: {self.emb_ban_dim}")
