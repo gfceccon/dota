@@ -285,7 +285,7 @@ class Schema:
 
     players_parsed_schema = {
         'match_id': pl.Int64,
-        'start_time': pl.Int64,
+        #'start_time': pl.Int64,
         'player_slot': pl.Int64,
         'obs_placed': pl.Int64,
         'sen_placed': pl.Int64,

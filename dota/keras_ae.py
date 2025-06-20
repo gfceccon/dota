@@ -4,7 +4,6 @@ from dota.logger import get_logger
 
 log = get_logger("Dota2AE")
 
-
 class Dota2AEKeras(Model):
     def __init__(
         self,
