@@ -1,7 +1,7 @@
 [project]
-name = "dota"
+name = "Dota 2 The International Games Cluster Analysis"
 version = "0.1.0"
-description = "Add your description here"
+description = "Uso de autoencoders e métodos de agrupamento para análise de jogos do Dota 2 de diversos anos e jogos do The International, a fim de identificar padrões e insights nos dados dos jogos."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

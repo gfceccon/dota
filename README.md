@@ -1,4 +1,4 @@
-# Strategy and Team Composition of Dota 2 Professional Games using Neural Networks and Clustering
+# Dota 2 The International Games Cluster Analysis
 ## Dataset
 [Dota 2 Pro League Matches](https://www.kaggle.com/datasets/bwandowando/dota-2-pro-league-matches-2023)
 

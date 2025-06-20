@@ -288,12 +288,14 @@ class DatasetHelper:
 
 
 class Dataset:
-    def __init__(self, year: int, path: str = ''):
+    def __init__(self, year: int, path: str = '', warning=False):
         """
         Inicializa o dataset otimizado do Dota 2.
         :param dataset_path: Caminho para o dataset (opcional).
         :param default_year: Ano padrão para carregamento dos dados.
         """
+        if (warning):
+            log.set_level(LogLevel.WARNING)
         log.separator()
         log.info("Inicializando Dataset Dota 2...")
 
@@ -302,6 +304,18 @@ class Dataset:
         self.year = year
         self.check_year()
         self.config.load()
+        self.optimizations = pl.QueryOptFlags(
+            predicate_pushdown=True,
+            projection_pushdown=True,
+            simplify_expression=True,
+            slice_pushdown=True,
+            comm_subplan_elim=True,
+            comm_subexpr_elim=True,
+            cluster_with_columns=True,
+            collapse_joins=True,
+            check_order_observe=True,
+            fast_projection=True,
+        )
 
     def get(self, path: str = '', slice=False) -> str:
         """
@@ -311,6 +325,7 @@ class Dataset:
         :return: Caminho para o dataset principal.
         """
         self.check_year()
+        log.separator()
         cache_dir = os.path.join(self.config.data_path, str(self.year))
         if (path != '' and path is not None and os.path.exists(path)):
             log.info(f"Usando caminho fornecido: {path}")
@@ -324,6 +339,7 @@ class Dataset:
             log.info(
                 f"Cache não encontrado para o ano {self.year}, processando dados...")
         os.makedirs(cache_dir, exist_ok=True)
+        log.separator()
         # Carrega e processa os dados principais
         metadata = self.metadata()
         players = self.players()
@@ -334,51 +350,30 @@ class Dataset:
         heroes.collect().write_parquet(os.path.join(cache_dir, 'heroes.parquet'))
         objectives.collect().write_parquet(os.path.join(cache_dir, 'objectives.parquet'))
         log.info("Salvando metadata em Parquet...")
-        metadata.collect().write_parquet(
+        metadata.collect(optimizations=self.optimizations).write_parquet(
             os.path.join(cache_dir, 'metadata.parquet'))
         log.info("Salvando player em Parquet...")
-        players.collect().write_parquet(
+        players.collect(optimizations=self.optimizations).write_parquet(
             os.path.join(cache_dir, 'players.parquet'))
         # Gera o dado principal
         meta_aggregate = [pl.col(col).first().alias(
             col) for col in Schema.metadata_parsed_schema.keys() if col != "match_id"]
-        player_aggregate = [pl.col(col).drop_nulls().alias(
+        player_aggregate = [pl.col(col).alias(
             col) for col in Schema.players_parsed_schema.keys() if col != "match_id"]
-        heroes_aggregate = [pl.col(col).drop_nulls().alias(
+        heroes_aggregate = [pl.col(col).alias(
             col) for col in Schema.heroes_parsed_schema.keys() if col not in ["hero_id"]]
         data = (
             metadata
             .join(players, on="match_id", how="inner")
             .group_by("match_id")
             .agg([
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_id")).drop_nulls().alias("radiant_picks"),
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True)).then(
-                    pl.col("hero_id")).drop_nulls().alias("dire_picks"),
-
-                pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_id")).drop_nulls().alias("radiant_bans"),
-                pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(False)).then(
-                    pl.col("hero_id")).drop_nulls().alias("dire_bans"),
-
-                # *[pl.when(pl.col("team").eq(0) & pl.col("is_pick").eq(True))
-                # .then(pl.col(col).drop_nulls().alias(f"radiant_{col}"))
-                # for col in Schema.players_parsed_schema.keys() if col != "match_id"],
-
-                # *[pl.when(pl.col("team").eq(1) & pl.col("is_pick").eq(True))
-                # .then(pl.col(col).drop_nulls().alias(f"dire_{col}"))
-                # for col in Schema.players_parsed_schema.keys() if col != "match_id"],
-
-                # TODO Separar por time e 
-                # role vector de bans
-
                 *player_aggregate,
                 *meta_aggregate,
                 *heroes_aggregate,
             ])
         )
         log.info("Salvando arquivo principal em Parquet...")
-        data = data.collect()
+        data = data.collect(optimizations=self.optimizations)
         data.write_parquet(data_parquet_path)
         if slice:
             log.info("Criando um slice temporário do dataset...")
@@ -387,6 +382,71 @@ class Dataset:
             log.info("Slice criado com sucesso.")
         log.info(f"Cache salvo em {cache_dir}")
         return data_parquet_path
+
+    def reload_from_cache(self, path: str, slice: bool = False) -> pl.LazyFrame:
+        self.check_year()
+
+        cache_dir = os.path.join(self.config.data_path, str(self.year))
+        if (path != '' and path is not None and os.path.exists(path)):
+            log.info(f"Usando caminho fornecido: {path}")
+            cache_dir = path
+
+        if not os.path.exists(cache_dir):
+            log.error(
+                f"Caminho fornecido {cache_dir} não existe.")
+            raise FileNotFoundError(
+                f"Caminho fornecido {cache_dir} não existe.")
+
+        data_parquet_path = os.path.join(cache_dir, "data.parquet")
+        if os.path.exists(data_parquet_path):
+            log.info(
+                f"Cache encontrado {data_parquet_path}, sobrescrevendo o cache...")
+
+        if not os.path.join(cache_dir, 'metadata.parquet'):
+            log.error('Arquivo metadata.parquet não encontrado')
+            raise FileNotFoundError(
+                f"Arquivo metadata.parquet não encontrado em {cache_dir}.")
+        if not os.path.join(cache_dir, 'players.parquet'):
+            log.error('Arquivo players.parquet não encontrado')
+            raise FileNotFoundError(
+                f"Arquivo players.parquet não encontrado em {cache_dir}.")
+
+        # Carrega e processa os dados principais
+        metadata = pl.scan_parquet(os.path.join(cache_dir, 'metadata.parquet'))
+        players = pl.scan_parquet(os.path.join(cache_dir, 'players.parquet'))
+
+        # Gera o dado principal
+        meta_aggregate = [pl.col(col).first().alias(
+            col) for col in Schema.metadata_parsed_schema.keys() if col != "match_id"]
+        player_aggregate = [pl.col(col).alias(
+            col) for col in Schema.players_parsed_schema.keys() if col != "match_id"]
+        heroes_aggregate = [pl.col(col).alias(
+            col) for col in Schema.heroes_parsed_schema.keys() if col not in ["hero_id"]]
+
+        data = (
+            metadata
+            .join(players, on="match_id", how="inner")
+            .group_by("match_id")
+            .agg([
+                *player_aggregate,
+                *meta_aggregate,
+                *heroes_aggregate,
+            ])
+        )
+
+        log.info("Salvando arquivo principal em Parquet...")
+        data = data.collect()
+        data.write_parquet(data_parquet_path)
+
+        if slice:
+            log.info("Criando um slice temporário do dataset...")
+            data = data.sample(n=5)
+            data.write_json(os.path.join(cache_dir, 'data.json'))
+            log.info("Slice criado com sucesso.")
+
+        log.info(f"Cache salvo em {cache_dir}")
+
+        return pl.scan_parquet(path)
 
     def metadata(self) -> pl.LazyFrame:
         """
@@ -449,30 +509,31 @@ class Dataset:
                 .replace(self.config.hero_mapping)
                 .alias("hero_id"),
             )
-            .join(self.config._heroes(), on="hero_id", how="inner")
+        )
+        players = self.items_backpack(players)
+        players = (
+            players
             .join(
                 self.config._picks_bans(self.year),
                 on=["match_id", "hero_id"],
                 how="right"
             )
             .with_columns(
-                pl.when(pl.col("is_pick").eq(True)).then(pl.col('purchase_ward_observer').fill_null(0)),
-                pl.when(pl.col("is_pick").eq(True)).then(pl.col('purchase_ward_sentry').fill_null(0)),
-                pl.when(pl.col("is_pick").eq(True)).then(pl.col('purchase_gem').fill_null(0)),
-                pl.when(pl.col("is_pick").eq(True)).then(pl.col('purchase_rapier').fill_null(0)),
+                # pl.col('purchase_ward_observer').fill_null(0),
+                # pl.col('purchase_ward_sentry').fill_null(0),
+                # pl.col('purchase_gem').fill_null(0),
+                # pl.col('purchase_rapier').fill_null(0),
             )
         )
-
 
         select_columns: list[str] = [*[col for col in Schema.players_parsed_schema.keys(
         )], *[col for col in Schema.heroes_parsed_schema.keys() if col not in ["hero_id"]]]
 
-        log.info(f"{players.head().collect()}")
         players = (
-            self.items_backpack(players)
+            players
+            .join(self.config._heroes(), on="hero_id", how="inner")
             .select(select_columns)
         )
-        log.info(f"{players.head().collect()}")
 
         return players
 
@@ -512,7 +573,6 @@ class Dataset:
         self.check_year()
         log.separator()
         log.info(f"Processando itens e mochila dos jogadores...")
-        # TODO Excluir itens de ban
         data = (
             data.with_columns([
                 *[
@@ -542,21 +602,22 @@ class Dataset:
                 .alias("backpack_vector"),
             ])
             .drop([
-                f"item_{x}"
-                for x in range(0, 6)
-            ])
-            .drop([
-                f"item_{x}_idx"
-                for x in range(0, 6)
-            ])
-            .drop([
-                f"backpack_{x}"
-                for x in range(0, 3)
-            ])
-            .drop([
-                f"backpack_{x}_idx"
-                for x in range(0, 3)
-            ])
+                *[
+                    f"item_{x}"
+                    for x in range(0, 6)
+                ],
+                *[
+                    f"item_{x}_idx"
+                    for x in range(0, 6)
+                ],
+                *[
+                    f"backpack_{x}"
+                    for x in range(0, 3)
+                ],
+                *[
+                    f"backpack_{x}_idx"
+                    for x in range(0, 3)
+                ]])
         )
         return data
 
@@ -588,3 +649,22 @@ class Dataset:
         _path = ds.get(path)
         log.info(f"Dataset salvo em {_path}")
         return _path
+
+    def reset_cache(self, slice: bool = True) -> None:
+        """
+        Remove o cache do dataset para o ano especificado.
+        :return: None
+        """
+        log.separator()
+        log.info(f"Removendo cache do dataset para o ano {self.year}...")
+        cache_dir = os.path.join(self.config.data_path, str(self.year))
+        if os.path.exists(cache_dir):
+            for file in os.listdir(cache_dir):
+                file_path = os.path.join(cache_dir, file)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            log.info(f"Cache removido em {cache_dir}")
+        else:
+            log.warn(f"Nenhum cache encontrado para o ano {self.year}.")
+
+        self.get(slice=slice)
