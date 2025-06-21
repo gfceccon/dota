@@ -5,8 +5,7 @@ import polars as pl
 from .schemas import Schema
 from dota.logger import LogLevel, get_logger
 
-log = get_logger(name='dota_dataset',  level=LogLevel.INFO,
-                 log_file='log/dota_dataset.log',)
+log = get_logger(name='Dota Dataset',  log_file='log/dota_dataset.log',)
 
 
 DATASET = 'bwandowando/dota-2-pro-league-matches-2023'
@@ -288,14 +287,13 @@ class DatasetHelper:
 
 
 class Dataset:
-    def __init__(self, year: int, path: str = '', warning=False):
+    def __init__(self, year: int, path: str = '', log_level=LogLevel.INFO):
         """
         Inicializa o dataset otimizado do Dota 2.
         :param dataset_path: Caminho para o dataset (opcional).
         :param default_year: Ano padrão para carregamento dos dados.
         """
-        if (warning):
-            log.set_level(LogLevel.WARNING)
+        log.set_level(log_level)
         log.separator()
         log.info("Inicializando Dataset Dota 2...")
 
@@ -516,14 +514,10 @@ class Dataset:
             .join(
                 self.config._picks_bans(self.year),
                 on=["match_id", "hero_id"],
-                how="right"
+                how="right",
             )
-            .with_columns(
-                # pl.col('purchase_ward_observer').fill_null(0),
-                # pl.col('purchase_ward_sentry').fill_null(0),
-                # pl.col('purchase_gem').fill_null(0),
-                # pl.col('purchase_rapier').fill_null(0),
-            )
+            .fill_nan(None)
+            .fill_null(0)
         )
 
         select_columns: list[str] = [*[col for col in Schema.players_parsed_schema.keys(

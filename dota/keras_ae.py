@@ -78,7 +78,7 @@ class Dota2AEKeras(Model):
         # Modelo
         self.model = Model(inputs=inputs, outputs=output, name=self.name)
         self.model.compile(
-            optimizer=optimizers.Adam(learning_rate=self.lr),
+            optimizer=optimizers.Adam(learning_rate=self.lr), # pyright: ignore
             loss='mse',
             metrics=['mae']
         )
