@@ -1,7 +1,6 @@
 import os
 import kagglehub
 import polars as pl
-from .schemas import Schema
 from dota.logger import LogLevel, get_logger
 from dota.dataset_helper import DatasetHelper
 
@@ -14,7 +13,7 @@ DATASET = 'bwandowando/dota-2-pro-league-matches-2023'
 CAPTAINS_MODE = 2
 
 
-class Dataset:
+class Dota2Dataset:
     """
     Classe principal para manipulação e processamento do dataset de partidas profissionais de Dota 2.
     Responsável por carregar, filtrar, processar e salvar os dados em diferentes formatos.
@@ -72,12 +71,12 @@ class Dataset:
 
         # Dicionário com os arquivos e funções de fallback para cada tipo de dado
         files = {
-            'heroes_lf': ('heroes.parquet', lambda: self.config._heroes()),
-            'picks_bans_lf': ('picks_bans.parquet', lambda: self.config._picks_bans(self.year)),
-            'leagues_lf': ('leagues.parquet', lambda: self.config._leagues.lazy()),
-            'objectives_lf': ('objectives.parquet', lambda: self.config._objectives(self.year)),
-            'players_lf': ('players.parquet', lambda: self.config._players(self.year)),
-            'metadata_lf': ('metadata.parquet', lambda: self.config._metadata(self.year)),
+            'heroes_lf': ('heroes_lf.parquet', lambda: self.config._heroes()),
+            'picks_bans_lf': ('picks_bans_lf.parquet', lambda: self.config._picks_bans(self.year)),
+            'leagues_lf': ('leagues_lf.parquet', lambda: self.config._leagues.lazy()),
+            'objectives_lf': ('objectives_lf.parquet', lambda: self.config._objectives(self.year)),
+            'players_lf': ('players_lf.parquet', lambda: self.config._players(self.year)),
+            'metadata_lf': ('metadata_lf.parquet', lambda: self.config._metadata(self.year)),
         }
 
         # Carrega os arquivos do cache ou gera e salva se não existirem
@@ -119,8 +118,7 @@ class Dataset:
         log.separator()
 
         log.info("Salvando arquivo principal...")
-        games = self.games()
-        data = games.collect(optimizations=self.optimizations)
+        data = self.games()
         data.write_parquet(data_parquet_path)
         log.info(f"Cache salvo em {cache_dir}")
         return data_parquet_path
@@ -204,18 +202,56 @@ class Dataset:
 
         return players
 
-    def games(self) -> pl.LazyFrame:
+    def games(self) -> pl.DataFrame:
         """
         Retorna um LazyFrame com as informações agregadas das partidas, unindo metadados e jogadores.
         """
         cols = self.config.games_cols()
-        cols.remove("match_id")
+        first = ["duration", "radiant_win", "leagueid",
+                 "tier", "leaguename", "patch", "start_date_time"]
+        sum_cols = [f"{col}_{team}" for col in [
+            'purchase_ward_observer',
+            'purchase_ward_sentry',
+            'purchase_gem',
+            'purchase_rapier',] for team in ['radiant', 'dire']]
+        try:
+            for col in first:
+                cols.remove(col)
+            cols.remove("match_id")
+        except ValueError:
+            log.warning(
+                f"Algumas colunas não foram encontradas em {cols}, mas isso não é um problema.")
+
+        if os.path.exists(os.path.join(self.cache_path, "players.parquet")):
+            log.info("Carregando dados dos jogadores do cache...")
+            players = pl.read_parquet(os.path.join(
+                self.cache_path, "players.parquet"))
+        else:
+            log.info("Carregando dados dos jogadores do dataset...")
+            players = self.players()
+            players = players.collect(optimizations=self.optimizations)
+            players.write_parquet(os.path.join(
+                self.cache_path, "players.parquet"))
+        if os.path.exists(os.path.join(self.cache_path, "metadata.parquet")):
+            log.info("Carregando metadados do cache...")
+            metadata = pl.read_parquet(os.path.join(
+                self.cache_path, "metadata.parquet"))
+        else:
+            log.info("Carregando metadados do dataset...")
+            metadata = self.metadata()
+            metadata = metadata.collect(optimizations=self.optimizations)
+            metadata.write_parquet(os.path.join(
+                self.cache_path, "metadata.parquet"))
 
         data = (
-            self.metadata()
-            .join(self.players(), on="match_id", how="inner")
+            metadata
+            .join(players, on="match_id", how="inner")
             .group_by("match_id")
-            .agg(cols)
+            .agg(
+                *[pl.col(col).drop_nulls().alias(col) for col in cols if col not in first + sum_cols],
+                *[pl.col(col).first().alias(col) for col in first],
+                *[pl.col(col).sum().alias(col) for col in sum_cols],
+            )
         )
         return data
 
@@ -337,7 +373,7 @@ class Dataset:
         """
         log.separator()
         log.info(f"Salvando dataset do ano {year}...")
-        ds = Dataset(year, path)
+        ds = Dota2Dataset(year, path)
         _path = ds.get(path)
         log.info(f"Dataset salvo em {_path}")
         return _path

@@ -2,7 +2,7 @@ import ast
 import os
 import kagglehub
 import polars as pl
-from .schemas import Schema
+from dota.dataset_schema import Dota2DatasetSchema
 from dota.logger import get_logger
 
 # Classe auxiliar para configuração, carregamento e manipulação dos dados do dataset de Dota 2.
@@ -144,9 +144,9 @@ class DatasetHelper:
             hid: i + 1 for i, hid
             in enumerate(self.items_id)}
 
-        self.objetive_type = Schema.objectives_types
-        self.objective_team = Schema.objectives_teams
-        self.player_team = Schema.players_teams
+        self.objetive_type = Dota2DatasetSchema.objectives_types
+        self.objective_team = Dota2DatasetSchema.objectives_teams
+        self.player_team = Dota2DatasetSchema.players_teams
 
     def _metadata(self, year: int) -> pl.LazyFrame:
         """
@@ -276,7 +276,7 @@ class DatasetHelper:
         """
         self.check_year(year)
         list_columns = [
-            k for k, v in Schema.players_schema.items() if isinstance(v, pl.List)]
+            k for k, v in Dota2DatasetSchema.players_schema.items() if isinstance(v, pl.List)]
         return (
             self.lazy(f"{year}/players.csv")
             .with_columns(
@@ -295,7 +295,7 @@ class DatasetHelper:
             )
             .with_columns(
                 *[pl.col(col).cast(dtype, strict=False).alias(col)
-                  for col, dtype in Schema.players_schema.items()],
+                  for col, dtype in Dota2DatasetSchema.players_schema.items()],
             )
         )
 
@@ -398,7 +398,7 @@ class DatasetHelper:
                 .alias("attack_type"),
 
                 *[pl.col(k).cast(v, strict=False).alias(k)
-                  for k, v in Schema.heroes_schema.items()]
+                  for k, v in Dota2DatasetSchema.heroes_schema.items()]
             ])
         )
         size = len(self.role_mapping)
@@ -427,7 +427,7 @@ class DatasetHelper:
         """
         Retorna as colunas selecionadas para os metadados processados.
         """
-        select_columns_set = set(Schema.metadata_parsed_schema.keys())
+        select_columns_set = set(Dota2DatasetSchema.metadata_parsed_schema.keys())
         select_columns = list(select_columns_set)
 
         return select_columns
@@ -437,8 +437,8 @@ class DatasetHelper:
         Retorna as colunas e nomes processados para jogadores (incluindo times).
         """
         select_columns_set = set([
-            *Schema.players_parsed_schema.keys(),
-            *Schema.heroes_parsed_schema.keys()])
+            *Dota2DatasetSchema.players_parsed_schema.keys(),
+            *Dota2DatasetSchema.heroes_parsed_schema.keys()])
 
         select_columns = list(select_columns_set)
 
@@ -456,7 +456,7 @@ class DatasetHelper:
         """
         return [(col, f"{col}_ban_{name}", team)
                 for team, name in [(0, "radiant"), (1, "dire")]
-                for col, _ in Schema.ban_parsed_schema.items()]
+                for col, _ in Dota2DatasetSchema.ban_parsed_schema.items()]
 
     def games_cols(self) -> list[str]:
         """
