@@ -5,7 +5,9 @@ import polars as pl
 from .schemas import Schema
 from dota.logger import get_logger
 
-log = get_logger(name='Dota Dataset Helper',
+# Classe auxiliar para configuração, carregamento e manipulação dos dados do dataset de Dota 2.
+# Responsável por carregar arquivos, aplicar mapeamentos, validar anos e fornecer funções utilitárias para o processamento dos dados.
+log = get_logger(name='Dota Dataset',
                  log_file='log/dota_dataset_helper.log',)
 
 
@@ -17,10 +19,19 @@ class DatasetHelper:
                  path: str = '',
                  duration: tuple[int, int] = (10 * 60, 180 * 60),
                  tier: list[str] = ['professional', 'premium'],
-                 years: tuple[int, int] = (2021, 2024),):
+                 years: tuple[int, int] = (2021, 2024),
+                 force_download: bool = False):
+
+        """
+        Inicializa o helper do dataset, configurando caminhos, filtros e baixando dados se necessário.
+        """
 
         self.dataset_name = DATASET
         self.data_path = 'tmp/dota/dataset/'
+
+        if force_download:
+            log.info("Forçando download do dataset completo...")
+            path = kagglehub.dataset_download(handle=self.dataset_name,)
 
         log.separator()
         log.info("Inicializando configuração do dataset...")
@@ -40,11 +51,17 @@ class DatasetHelper:
         log.info(f"Caminho dos dados: {self.data_path}")
 
     def load(self) -> None:
+        """
+        Carrega constantes, IDs e mapeamentos necessários para o processamento dos dados.
+        """
         self.load_constants()
         self.load_constants_ids()
         self.load_mappings()
 
     def load_constants(self):
+        """
+        Carrega arquivos de constantes (ligas, heróis, itens, patches) do dataset.
+        """
         log.separator()
         log.info("Carregando constantes...")
         self._leagues = pl.read_csv(
@@ -69,6 +86,9 @@ class DatasetHelper:
         log.info(f"Patches: {self._patches.shape}")
 
     def load_constants_ids(self) -> None:
+        """
+        Carrega e processa IDs únicos de atributos, funções e heróis para facilitar mapeamentos.
+        """
         log.separator()
         log.info("Carregando IDs das constantes...")
 
@@ -96,6 +116,9 @@ class DatasetHelper:
             .to_series().to_list())
 
     def load_mappings(self) -> None:
+        """
+        Cria dicionários de mapeamento para atributos, funções, heróis e itens.
+        """
         log.separator()
         log.info("Carregando mapeamentos de IDs...")
 
@@ -126,10 +149,27 @@ class DatasetHelper:
         self.player_team = Schema.players_teams
 
     def _metadata(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega e processa o arquivo de metadados para o ano especificado.
+        """
         self.check_year(year)
-        return self.lazy(f"{year}/main_metadata.csv")
+        return (
+            self.lazy(f"{year}/main_metadata.csv")
+            .with_columns([
+                pl.col("tower_status_radiant").str.replace_all(
+                    "'", "").alias("tower_status_radiant"),
+                pl.col("tower_status_dire").str.replace_all(
+                    "'", "").alias("tower_status_dire"),
+                pl.col("barracks_status_radiant").str.replace_all(
+                    "'", "").alias("barracks_status_radiant"),
+                pl.col("barracks_status_dire").str.replace_all(
+                    "'", "").alias("barracks_status_dire"),
+            ]))
 
-    def all_metadata(self, year: int) -> pl.LazyFrame:
+    def all_metadata(self) -> pl.LazyFrame:
+        """
+        Carrega e concatena metadados de todos os anos configurados.
+        """
         log.separator()
         log.info(
             f"Carregando metadados de {self.start_year} até {self.end_year}...")
@@ -161,6 +201,9 @@ class DatasetHelper:
         return concat.select(*names)
 
     def all_players(self) -> pl.LazyFrame:
+        """
+        Carrega e concatena dados de jogadores de todos os anos configurados.
+        """
         log.separator()
         log.info(
             f"Carregando players de {self.start_year} até {self.end_year}...")
@@ -192,6 +235,9 @@ class DatasetHelper:
         return concat.select(*names)
 
     def lazy(self, dataset: str = '') -> pl.LazyFrame:
+        """
+        Carrega um arquivo CSV como LazyFrame, verificando existência do arquivo.
+        """
         log.separator()
         log.info(f"Carregando {os.path.join(self.dataset_path, dataset)}...")
         if not os.path.exists(os.path.join(self.dataset_path, dataset)):
@@ -202,6 +248,9 @@ class DatasetHelper:
         return pl.scan_csv(os.path.join(self.dataset_path, dataset))
 
     def try_load_cache(self, path: str) -> str:
+        """
+        Tenta localizar o cache do dataset localmente, senão baixa do KaggleHub.
+        """
         if (path == '' or path is None):
             path = os.path.expanduser(
                 f'~/.cache/kagglehub/datasets/{self.dataset_name}/versions/')
@@ -222,6 +271,9 @@ class DatasetHelper:
         return path
 
     def _players(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega e processa o arquivo de jogadores para o ano especificado.
+        """
         self.check_year(year)
         list_columns = [
             k for k, v in Schema.players_schema.items() if isinstance(v, pl.List)]
@@ -234,20 +286,23 @@ class DatasetHelper:
                 .alias("hero_id"),
             )
             .with_columns(
-                pl.col(col).fill_null("[]").map_elements(
-                    lambda x: ast.literal_eval(x if x != "" else "[]") if isinstance(
+                pl.col(col).map_elements(
+                    lambda x: ast.literal_eval(x) if isinstance(
                         x, str) and x != "" else x,
                     return_dtype=pl.List(pl.Float64)
                 ).alias(col)
                 for col in list_columns
             )
             .with_columns(
-                *[pl.col(col).cast(dtype, strict=False).fill_null(strategy='zero').alias(col)
+                *[pl.col(col).cast(dtype, strict=False).alias(col)
                   for col, dtype in Schema.players_schema.items()],
             )
         )
 
     def _objectives(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega e processa o arquivo de objetivos para o ano especificado.
+        """
         self.check_year(year)
         return (
             self.lazy(f"{year}/objectives.csv")
@@ -263,6 +318,9 @@ class DatasetHelper:
             ))
 
     def _picks_bans(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega e processa o arquivo de picks e bans para o ano especificado.
+        """
         self.check_year(year)
         return (
             self.lazy(f"{year}/picks_bans.csv")
@@ -271,21 +329,35 @@ class DatasetHelper:
                 .cast(pl.Int64, strict=False)
                 .replace(self.hero_mapping)
                 .alias("hero_id"),
-            ))
+            )
+            .select("is_pick", "hero_id", "team", "match_id")
+        )
 
     def _exp_adv(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega o arquivo de vantagem de experiência para o ano especificado.
+        """
         self.check_year(year)
         return self.lazy(f"{year}/radiant_exp_adv.csv")
 
     def _gold_adv(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega o arquivo de vantagem de ouro para o ano especificado.
+        """
         self.check_year(year)
         return self.lazy(f"{year}/radiant_gold_adv.csv")
 
     def _team_fights(self, year: int) -> pl.LazyFrame:
+        """
+        Carrega o arquivo de team fights para o ano especificado.
+        """
         self.check_year(year)
         return self.lazy(f"{year}/team_fights.csv")
 
     def _heroes(self) -> pl.LazyFrame:
+        """
+        Carrega e processa os dados dos heróis, aplicando mapeamentos e conversões.
+        """
         log.separator()
         log.info("Carregando dados dos heróis...")
         heroes = (
@@ -342,8 +414,55 @@ class DatasetHelper:
         return pl.LazyFrame(rows)
 
     def check_year(self, year: int) -> None:
+        """
+        Verifica se o ano está dentro do intervalo permitido.
+        """
         if not (self.start_year <= year <= self.end_year):
             log.error(
                 f"Ano {year} está fora do intervalo ({self.start_year}-{self.end_year}).")
             raise ValueError(
                 f"Ano {year} está fora do intervalo ({self.start_year}-{self.end_year}).")
+
+    def metadata_cols(self) -> list[str]:
+        """
+        Retorna as colunas selecionadas para os metadados processados.
+        """
+        select_columns_set = set(Schema.metadata_parsed_schema.keys())
+        select_columns = list(select_columns_set)
+
+        return select_columns
+
+    def players_cols(self) -> list[tuple[str, str, int]]:
+        """
+        Retorna as colunas e nomes processados para jogadores (incluindo times).
+        """
+        select_columns_set = set([
+            *Schema.players_parsed_schema.keys(),
+            *Schema.heroes_parsed_schema.keys()])
+
+        select_columns = list(select_columns_set)
+
+        permutations = [
+            (col, f"{col}_{name}", team)
+            for col in select_columns
+            for team, name in [(0, "radiant"), (1, "dire")]
+        ]
+
+        return permutations
+
+    def ban_cols(self) -> list[tuple[str, str, int]]:
+        """
+        Retorna as colunas e nomes processados para bans (incluindo times).
+        """
+        return [(col, f"{col}_ban_{name}", team)
+                for team, name in [(0, "radiant"), (1, "dire")]
+                for col, _ in Schema.ban_parsed_schema.items()]
+
+    def games_cols(self) -> list[str]:
+        """
+        Retorna todas as colunas finais para o dataset consolidado.
+        """
+        metadata_cols = self.metadata_cols()
+        players_cols = [col for _, col, _ in self.players_cols()]
+        ban_cols = [col for _, col, _ in self.ban_cols()]
+        return list(set(metadata_cols + players_cols + ban_cols))

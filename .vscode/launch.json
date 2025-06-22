@@ -5,43 +5,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Reset",
+      "name": "Run",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--year", "2024", "--slice", "--reset"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Slice",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--year", "2024", "--slice"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Reload",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--year", "2024", "--reload", "--slice"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Redownload",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--year", "2024", "--download"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Both",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--year", "2024", "--both"],
+      "args": ["--year", "2024"],
       "console": "integratedTerminal"
     },
   ]
