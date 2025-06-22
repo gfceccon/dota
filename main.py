@@ -12,6 +12,7 @@ if __name__ == "__main__":
     parser.add_argument('--slice', action='store_true', help='Criar um slice temporário do dataset (só funciona com um novo cache)')
     parser.add_argument('--download', action='store_true', help='Força baixar o dataset completo')
     parser.add_argument('--reset', action='store_true', help='Força cachear o dataset completo')
+    parser.add_argument('--both', action='store_true', help='Usa uma query só')
     parser.add_argument('--reload', nargs='?', const='tmp/dota/dataset/', type=str, help='Força criar o data.parquet usando o cache (opcionalmente especifique o caminho)', default=None)
     args = parser.parse_args()
 
@@ -33,4 +34,7 @@ if __name__ == "__main__":
         log.info(f"Recarregando o dataset de Dota 2 para o ano {args.year}...")
         ds = Dataset(args.year)
         ds.reload_from_cache(path=os.path.join(args.reload, str(args.year)), slice=args.slice)
+    if args.both:
+        ds = Dataset(args.year)
+        d = ds.both()
     

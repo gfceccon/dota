@@ -7,6 +7,7 @@ class Schema:
         'version': pl.Int64,
         'match_id': pl.Int64,
         'leagueid': pl.Int64,
+        'game_mode': pl.Int64,
 
         'start_date_time': pl.Date,
         'duration': pl.Int64,
@@ -251,6 +252,21 @@ class Schema:
         'night_vision': pl.Float64,
     }
 
+    heroes_parsed_raw = {
+        'hero_id': pl.Float64,
+        'hero_name': pl.String,
+        'primary_attribute': pl.Int64,
+        'attack_type': pl.Int64,
+        'roles_vector': pl.List(pl.Int32),
+    }
+
+    heroes_parsed_normalize = {
+        'attack_range': pl.Float64,
+        'move_speed': pl.Float64,
+        'day_vision': pl.Float64,
+        'night_vision': pl.Float64,
+    }
+
     metadata_parsed_schema = {
         # Metadata
         'version': pl.Int64,
@@ -285,7 +301,7 @@ class Schema:
 
     players_parsed_schema = {
         'match_id': pl.Int64,
-        #'start_time': pl.Int64,
+        # 'start_time': pl.Int64,
         'player_slot': pl.Int64,
         'obs_placed': pl.Int64,
         'sen_placed': pl.Int64,
@@ -352,3 +368,63 @@ class Schema:
         'team': pl.Int64,
         'order': pl.Int64,
     }
+
+    players_parsed_raw = {
+        'match_id': pl.Int64,
+        'player_slot': pl.Int64,
+        'firstblood_claimed': pl.Boolean,
+        'teamfight_participation': pl.Float64,
+        'times': pl.List(pl.Float64),
+        'gold_t': pl.List(pl.Float64),
+        'lh_t': pl.List(pl.Float64),
+        'dn_t': pl.List(pl.Float64),
+        'xp_t': pl.List(pl.Float64),
+        'account_id': pl.Int64,
+        'hero_id': pl.Int64,
+        'items_vector': pl.Int64,
+        'backpack_vector': pl.Int64,
+        'item_neutral': pl.Int64,
+        'is_pick': pl.Boolean,
+        'team': pl.Int64,
+        'order': pl.Int64,
+        'purchase_ward_observer': pl.Float64,
+        'purchase_ward_sentry': pl.Float64,
+        'purchase_gem': pl.Float64,
+        'purchase_rapier': pl.Float64,
+    }
+    players_parsed_normalize = {
+        'obs_placed': pl.Int64,
+        'sen_placed': pl.Int64,
+        'creeps_stacked': pl.Int64,
+        'camps_stacked': pl.Int64,
+        'rune_pickups': pl.Int64,
+        'towers_killed': pl.Int64,
+        'roshans_killed': pl.Int64,
+        'stuns': pl.Float64,
+        'kills': pl.Int64,
+        'deaths': pl.Int64,
+        'assists': pl.Int64,
+        'last_hits': pl.Int64,
+        'denies': pl.Int64,
+        'gold_per_min': pl.Int64,
+        'xp_per_min': pl.Int64,
+        'level': pl.Int64,
+        'net_worth': pl.Int64,
+        'hero_damage': pl.Int64,
+        'tower_damage': pl.Int64,
+        'hero_healing': pl.Int64,
+        'gold': pl.Int64,
+        'gold_spent': pl.Int64,
+        'neutral_kills': pl.Int64,
+        'tower_kills': pl.Int64,
+        'courier_kills': pl.Int64,
+        'lane_kills': pl.Int64,
+        'hero_kills': pl.Int64,
+        'observer_kills': pl.Int64,
+        'sentry_kills': pl.Int64,
+        'roshan_kills': pl.Int64,
+        'necronomicon_kills': pl.Int64,
+        'ancient_kills': pl.Int64,
+        'buyback_count': pl.Int64,
+    }
+
