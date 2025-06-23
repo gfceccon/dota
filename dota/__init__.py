@@ -7,7 +7,6 @@ from .dataset import Dota2Dataset, DatasetHelper
 from .logger import get_logger
 from .autoencoder import Dota2AE
 from .cluster import Dota2Cluster
-from .keras_ae import Dota2AEKeras
 
 __all__ = [
     "Dota2",
@@ -15,6 +14,5 @@ __all__ = [
     "DatasetHelper",
     "get_logger",
     "Dota2AE",
-    "Dota2Cluster",
-    "Dota2AEKeras"
+    "Dota2Cluster"
 ]

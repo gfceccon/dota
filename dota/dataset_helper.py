@@ -264,8 +264,12 @@ class DatasetHelper:
                         f"Caminho do dataset encontrado no cache: {path}")
                 else:
                     log.error(
-                        "Caminho do dataset não foi fornecido e não pode ser encontrado no KaggleHub.")
+                        "Caminho do dataset não foi fornecido e não pode ser encontrado no cache.")
                     path = ''
+            else:
+                log.error(
+                    "Caminho do dataset não foi fornecido e não pode ser encontrado no cache.")
+                path = ''
         if (path == '' or path is None):
             path = kagglehub.dataset_download(handle=self.dataset_name,)
         return path

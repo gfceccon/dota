@@ -366,8 +366,8 @@ class Dota2DatasetSchema:
         'purchase_rapier': pl.Float64,
 
         # Picks and Bans
-        'is_pick': pl.Boolean,
-        'team': pl.Int64,
+        #'is_pick': pl.Boolean,
+        #'team': pl.Int64,
         # 'order': pl.Int64,
     }
 
